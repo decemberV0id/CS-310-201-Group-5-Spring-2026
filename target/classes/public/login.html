@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Simple Login</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 100px; }
+    input { padding: 10px; margin: 10px; width: 250px; }
+    button { padding: 12px 30px; background: #4CAF50; color: white; border: none; }
+    .message { margin-top: 30px; font-size: 1.3em; }
+  </style>
+</head>
+<body>
+
+  <h1>Login</h1>
+
+  <form id="myform">
+    <input type="text" name="username" placeholder="Username" required><br>
+    <input type="password" name="password" placeholder="Password" required><br><br>
+    <button type="submit">Login</button>
+  </form>
+
+  <div id="result" class="message"></div>
+
+  <script>
+    document.getElementById("myform").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      let formData = new FormData(this);
+
+      fetch("/login", {
+        method: "POST",
+        body: formData
+      })
+      .then(response => response.text())
+      .then(text => {
+        // Show the message from server
+        document.getElementById("result").innerHTML = text;
+
+        // If server said "Welcome" → auto redirect after 1 second
+        if (text.includes("Welcome")) {
+          setTimeout(() => {
+            window.location.href = "/dashboard.html";
+          }, 1000);
+        }
+      })
+      .catch(err => {
+        document.getElementById("result").innerHTML = "Error: could not connect";
+      });
+    });
+  </script>
+
+</body>
+</html>
