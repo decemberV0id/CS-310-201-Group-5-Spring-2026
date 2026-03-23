@@ -55,5 +55,117 @@ public class HospitalServer {
                 ctx.result("<h2>Database problem :(</h2>");
             }
         });
+        app.post("/register", ctx -> {
+            String username = ctx.formParam("username");
+            String hashedPw = ctx.formParam("password");
+            String email = ctx.formParam("email");
+            int age = Integer.parseInt(ctx.formParam("age"));
+            String ssn = ctx.formParam("ssn");
+            //String url = "jdbc:sqlite:hospital.db";
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
+                conn.setAutoCommit(false);
+                try (
+                    PreparedStatement insertAccount = conn.prepareStatement(
+                        "INSERT INTO Account (user_name, password, email) VALUES (?, ?, ?)");
+                    PreparedStatement insertPatient = conn.prepareStatement(
+                        "INSERT INTO PatientAccount (user_name, age, ssn) VALUES (?, ?, ?)")
+                ) {
+                    insertAccount.setString(1, username);
+                    insertAccount.setString(2, hashedPw);
+                    insertAccount.setString(3, email);
+                    insertAccount.executeUpdate();
+
+                    insertPatient.setString(1, username);
+                    insertPatient.setInt(2, age);
+                    insertPatient.setString(3, ssn);
+                    insertPatient.executeUpdate();
+
+                    conn.commit();
+                } catch (SQLException ex) {
+                    conn.rollback();
+                    throw ex;
+                }
+            }
+        });
+
+        app.post("/updatePatient", ctx -> {
+            String username = ctx.formParam("username");
+            String password = ctx.formParam("password");
+            String email = ctx.formParam("email");
+            String ageStr = ctx.formParam("age");
+            String ssn = ctx.formParam("ssn");
+
+            if (username == null || username.isBlank()) {
+                ctx.result("Username is required");
+                return;
+            }
+
+            Integer age = null;
+            if (ageStr != null && !ageStr.isBlank()) {
+                try {
+                    age = Integer.parseInt(ageStr);
+                } catch (NumberFormatException e) {
+                    ctx.result("Age must be a number");
+                    return;
+                }
+            }
+
+            try {
+                boolean updated = updatePatientAccount(username, password, email, age, ssn);
+                if (updated) {
+                    ctx.result("<h2>Patient info updated successfully</h2>");
+                } else {
+                    ctx.result("<h2>User not found or update failed</h2>");
+                }
+            } catch (SQLException ex) {
+                ctx.result("<h2>Database problem: " + ex.getMessage() + "</h2>");
+            }
+        });
+    }
+
+    private static boolean updatePatientAccount(String username, String password, String email, Integer age, String ssn) throws SQLException {
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
+            conn.setAutoCommit(false);
+
+            // user must already exist
+            try (PreparedStatement checkUser = conn.prepareStatement("SELECT 1 FROM Account WHERE user_name = ?")) {
+                checkUser.setString(1, username);
+                try (ResultSet rs = checkUser.executeQuery()) {
+                    if (!rs.next()) {
+                        return false;
+                    }
+                }
+            }
+
+            // update account fields with values provided (nullable)
+            try (PreparedStatement updateAccount = conn.prepareStatement(
+                    "UPDATE Account SET password = COALESCE(?, password), email = COALESCE(?, email) WHERE user_name = ?")) {
+                updateAccount.setString(1, password);
+                updateAccount.setString(2, email);
+                updateAccount.setString(3, username);
+                updateAccount.executeUpdate();
+            }
+
+            // upsert patient account data
+            try (PreparedStatement upsertPatient = conn.prepareStatement(
+                    "INSERT INTO PatientAccount (user_name, age, ssn) VALUES (?, ?, ?) " +
+                    "ON CONFLICT(user_name) DO UPDATE SET age = COALESCE(excluded.age, PatientAccount.age), ssn = COALESCE(excluded.ssn, PatientAccount.ssn)")) {
+                upsertPatient.setString(1, username);
+                if (age != null) {
+                    upsertPatient.setInt(2, age);
+                } else {
+                    upsertPatient.setNull(2, java.sql.Types.INTEGER);
+                }
+                upsertPatient.setString(3, ssn);
+                upsertPatient.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException ex) {
+            // don't hide what happened; caller can decide to show error
+            throw ex;
+        }
     }
 }
