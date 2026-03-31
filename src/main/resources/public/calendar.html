@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Calendar with Events</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    table {
+      margin: 20px auto;
+      border-collapse: collapse;
+    }
+    th, td {
+      width: 50px;
+      height: 50px;
+      border: 1px solid #ccc;
+      vertical-align: middle;
+    }
+    th {
+      background: #e0e0e0;
+      font-weight: bold;
+    }
+    .today {
+      background: #fffacd;
+      font-weight: bold;
+    }
+    .event-day {
+      background: #e6ffe6;      /* light green for days with events */
+      font-weight: bold;
+    }
+    button.day-btn {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: transparent;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button.day-btn:hover {
+      background: #e6f3ff;
+    }
+    #day-info {
+      margin-top: 30px;
+      min-height: 100px;
+      font-size: 16px;
+      color: #333;
+      padding: 20px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.5;
+    }
+    button.nav {
+      font-size: 18px;
+      padding: 8px 16px;
+      margin: 0 12px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h2 id="month-year">Month Year</h2>
+
+  <button class="nav" onclick="prevMonth()">← Previous</button>
+  <button class="nav" onclick="nextMonth()">Next →</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th>
+        <th>Thu</th><th>Fri</th><th>Sat</th>
+      </tr>
+    </thead>
+    <tbody id="calendar-body"></tbody>
+  </table>
+
+  <div id="day-info">Click a day to see details</div>
+
+  <script>
+    let date = new Date();
+
+    // === Your list of 3 special days with events ===
+    // Format: "YYYY-M-D": "event description"
+    // Change the dates and descriptions as needed
+    const eventDays = {
+      "2026-3-10": "10:00 AM – Doctor appointment<br>3:00 PM – Coffee with Alex",
+      "2026-3-18": "9:00 AM – Team standup<br>1:00 PM – Lunch meeting<br>7:00 PM – Yoga class",
+      "2026-3-25": "All day – Project deadline<br>4:00 PM – Client review call"
+    };
+
+    function renderCalendar() {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+
+      document.getElementById("month-year").textContent = 
+        date.toLocaleString("default", { month: "long", year: "numeric" });
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const today = new Date();
+
+      const body = document.getElementById("calendar-body");
+      body.innerHTML = "";
+
+      let row = document.createElement("tr");
+
+      // Empty cells before day 1
+      for (let i = 0; i < firstDay; i++) {
+        row.appendChild(document.createElement("td"));
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        let td = document.createElement("td");
+        let btn = document.createElement("button");
+        btn.className = "day-btn";
+        btn.textContent = day;
+
+        const dateKey = `${year}-${month + 1}-${day}`;
+
+        // Highlight today
+        if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+          td.className = "today";
+        }
+
+        // Highlight days with events
+        if (eventDays[dateKey]) {
+          td.className = "event-day";
+        }
+
+        // Click behavior
+        btn.onclick = function() {
+          if (eventDays[dateKey]) {
+            document.getElementById("day-info").innerHTML = `
+              <strong>${dateKey}</strong><br>
+              Events:<br>
+              ${eventDays[dateKey]}
+            `;
+          } else {
+            document.getElementById("day-info").innerHTML = `
+              <strong>${dateKey}</strong><br>
+              No events scheduled
+            `;
+          }
+        };
+
+        td.appendChild(btn);
+        row.appendChild(td);
+
+        if ((firstDay + day) % 7 === 0) {
+          body.appendChild(row);
+          row = document.createElement("tr");
+        }
+      }
+
+      if (row.children.length > 0) {
+        body.appendChild(row);
+      }
+    }
+
+    function prevMonth() {
+      date.setMonth(date.getMonth() - 1);
+      renderCalendar();
+    }
+
+    function nextMonth() {
+      date.setMonth(date.getMonth() + 1);
+      renderCalendar();
+    }
+
+    renderCalendar();
+  </script>
+
+</body>
+</html>
