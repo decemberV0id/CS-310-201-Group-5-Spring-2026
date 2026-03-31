@@ -1,5 +1,4 @@
 com\portal\DatabaseTest.class
-com\portal\HospitalServer$Response.class
-com\portal\HospitalServer.class
-com\portal\App.class
+com\portal\CheckJohnPassword.class
 com\portal\DatabaseInitializer.class
+com\portal\HospitalServer.class
