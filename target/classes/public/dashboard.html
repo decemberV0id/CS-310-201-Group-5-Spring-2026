@@ -2,12 +2,138 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aloe Portal</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f0f9f5;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .header {
+      background-color: #e6f4ec;
+      padding: 15px 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #d1e8d9;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: bold;
+      color: #1a7c5e;
+    }
+
+    .main-container {
+      display: flex;
+      height: calc(100vh - 70px);
+    }
+
+    .sidebar {
+      width: 260px;
+      background-color: #ffffff;
+      border-right: 1px solid #e0e0e0;
+      padding: 20px 0;
+    }
+
+    .nav-item {
+      padding: 14px 25px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #34495e;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .nav-item:hover {
+      background-color: #f8fbf9;
+    }
+
+    .nav-item.active {
+      background-color: #1abc9c;
+      color: white;
+    }
+
+    /* Content Area - This will show the loaded HTML files */
+    .content {
+      flex: 1;
+      background-color: white;
+      overflow: hidden;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
 </head>
 <body>
-  <h1>Welcome to the Hospital Portal Dashboard</h1>
-  <p>You are logged in as John Marshall.</p>
-  <p>(This is a placeholder – add patient info, appointments, etc. here later)</p>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <span>🌿</span>
+      <span>Aloe Portal</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 20px;">
+      <span>🛎️</span>
+      <a href="#" style="color: #1a7c5e; text-decoration: none;">Logout</a>
+    </div>
+  </div>
+
+  <div class="main-container">
+    
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <a href="#" class="nav-item active" data-file="overview.html"> Overview</a>
+      <a href="#" class="nav-item" data-file="calendar.html"> Appointments</a>
+      <a href="#" class="nav-item" data-file="messages.html"> Messages</a>
+      <a href="#" class="nav-item" data-file="records.html"> Health Records</a>
+      <a href="#" class="nav-item" data-file="medications.html"> Medications</a>
+      <a href="#" class="nav-item" data-file="results.html"> Test Results</a>
+      <a href="#" class="nav-item" data-file="profile.html"> Profile</a>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content">
+      <iframe id="content-frame" src="overview.html"></iframe>
+    </div>
+  </div>
+
+  <script>
+    const navItems = document.querySelectorAll('.nav-item');
+    const iframe = document.getElementById('content-frame');
+
+    navItems.forEach(item => {
+      item.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        // Remove active class from all tabs
+        navItems.forEach(nav => nav.classList.remove('active'));
+
+        // Activate the clicked tab
+        this.classList.add('active');
+
+        // Load the corresponding HTML file into the iframe
+        const fileName = this.getAttribute('data-file');
+        iframe.src = fileName;
+      });
+    });
+  </script>
+
 </body>
 </html>
