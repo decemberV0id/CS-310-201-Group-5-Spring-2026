@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EHR Message Page</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f5f7;
+      color: #333;
+    }
+
+    .main {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      background: #ffffff;
+    }
+
+    .patient-banner {
+      padding: 15px 20px;
+      background: #e6eef4;
+      border-bottom: 1px solid #d3dce3;
+    }
+
+    .patient-banner h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .messages {
+      padding: 20px;
+      overflow-y: auto;
+      background: #f9fafb;
+    }
+
+    .message {
+      background: #ffffff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      border: 1px solid #e1e5e9;
+      cursor: pointer;
+    }
+
+    .message:hover {
+      border-color: #9fcbb1;
+    }
+
+    .message-header {
+      font-weight: bold;
+      color: #1e4f7b;
+    }
+
+    .timestamp {
+      font-size: 12px;
+      color: #777;
+    }
+
+    .message-body {
+      display: none;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+
+    .message.selected {
+      border: 2px solid #2e9f4f;
+      box-shadow: 0 0 0 2px rgba(46, 159, 79, 0.15);
+    }
+
+    .message.selected .message-body {
+      display: block;
+    }
+
+    /* Compose Bar */
+    .compose {
+      padding: 15px;
+      border-top: 1px solid #d3dce3;
+      background: #f5f7f9;
+      cursor: pointer;
+    }
+
+    .compose span {
+      color: #555;
+      font-size: 14px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal {
+      background: #ffffff;
+      width: 420px;
+      max-width: 90%;
+      padding: 20px;
+      border-radius: 6px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .modal h3 {
+      margin-top: 0;
+      color: #1e4f7b;
+    }
+
+    .modal label {
+      display: block;
+      margin-top: 12px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .modal input,
+    .modal textarea {
+      width: 100%;
+      margin-top: 5px;
+      padding: 8px;
+      border: 1px solid #c7d0d8;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .modal textarea {
+      height: 100px;
+      resize: none;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 15px;
+    }
+
+    .modal-actions button {
+      min-width: 90px;
+      padding: 10px 18px;
+    }
+
+    button.secondary {
+      background: #e1e5e9;
+      color: #333;
+    }
+
+    button.secondary:hover {
+      background: #cfd6dc;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="main">
+
+  <div class="patient-banner">
+    <h3>Patient: John Doe • DOB: XX/XX/XXXX</h3>
+  </div>
+
+  <div class="messages">
+    <div class="message" tabindex="0">
+      <div class="message-header">From: Dr. Thompson</div>
+      <div class="timestamp">March 26, 2026 at 4:18 PM</div>
+      <div class="message-body">
+        Please review the patient's blood pressure readings and confirm
+        whether medication adjustments are necessary.
+      </div>
+    </div>
+
+    <div class="message" tabindex="0">
+      <div class="message-header">From: Nurse Allen</div>
+      <div class="timestamp">March 27, 2026 at 9:04 AM</div>
+      <div class="message-body">
+        The patient reports mild dizziness this morning.
+        Vitals have been entered into the chart.
+      </div>
+    </div>
+  </div>
+
+  <!-- Compose Bar (single click target) -->
+  <div class="compose" id="composeBar">
+    <span><i>Click here to send a new message…</i></span>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="messageModal">
+  <div class="modal">
+    <h3>New Message</h3>
+
+    <label for="modalTo">To</label>
+    <input id="modalTo" type="text" placeholder="Recipient" />
+
+    <label for="modalMessage">Message</label>
+    <textarea id="modalMessage" placeholder="Type your message…"></textarea>
+
+    <div class="modal-actions">
+      <button class="secondary" id="cancelModal" type="button">Cancel</button>
+      <button id="sendModal" type="button">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Message selection
+  document.querySelectorAll('.message').forEach(msg => {
+    msg.addEventListener('click', () => {
+      document.querySelectorAll('.message')
+        .forEach(m => m.classList.remove('selected'));
+      msg.classList.add('selected');
+    });
+  });
+
+  // Modal logic
+  const modal = document.getElementById('messageModal');
+  const composeBar = document.getElementById('composeBar');
+
+  composeBar.addEventListener('click', () => {
+    modal.style.display = 'flex';
+    setTimeout(() => document.getElementById('modalTo').focus(), 0);
+  });
+
+  document.getElementById('cancelModal').onclick = closeModal;
+  document.getElementById('sendModal').onclick = closeModal;
+
+  function closeModal() {
+    modal.style.display = 'none';
+    modal.querySelector('input').value = '';
+    modal.querySelector('textarea').value = '';
+  }
+</script>
+
+</body>
+</html>
