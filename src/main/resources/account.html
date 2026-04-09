@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Patient Reports</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 100px; }
+  </style>
+</head>
+<body>
+ 
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🏥</div>
+      <span class="logo-text">Green Valley Medical Center</span>
+    </div>
+    <div class="header-right">
+      <span>Patient Portal</span>
+      <button class="btn-logout">Log Out</button>
+    </div>
+  </header>
+ 
+  <div class="page-wrapper">
+ 
+    <!-- WELCOME BAR -->
+    <div class="welcome-bar">
+      <div>
+        <h1>Welcome back, Jane!</h1>
+        <p>Here's a summary of your health information.</p>
+      </div>
+      <div class="last-login">Last login: April 1, 2026 · 9:14 AM</div>
+    </div>
+ 
+    <div class="grid">
+ 
+      <!-- PATIENT PERSONAL INFO -->
+      <div class="card full-width">
+        <div class="card-header">
+          <span class="icon">👤</span> Patient Information
+        </div>
+        <div class="card-body">
+          <div class="info-grid">
+            <div class="info-item">
+              <label>Full Name</label>
+              <p>Jane M. Doe</p>
+            </div>
+            <div class="info-item">
+              <label>Date of Birth</label>
+              <p>March 14, 1985 &nbsp;(Age 41)</p>
+            </div>
+            <hr class="info-divider"/>
+            <div class="info-item">
+              <label>Patient ID</label>
+              <p>GVM-00487291</p>
+            </div>
+            <div class="info-item">
+              <label>Primary Care Physician</label>
+              <p>Dr. Samuel Ortega, MD</p>
+            </div>
+            <hr class="info-divider"/>
+            <div class="info-item">
+              <label>Phone Number</label>
+              <p>(304) 555-0192</p>
+            </div>
+            <div class="info-item">
+              <label>Email Address</label>
+              <p>jane.doe@email.com</p>
+            </div>
+            <hr class="info-divider"/>
+            <div class="info-item">
+              <label>Address</label>
+              <p>742 Evergreen Terrace, Huntington, WV 25701</p>
+            </div>
+            <div class="info-item">
+              <label>Emergency Contact</label>
+              <p>John Doe &nbsp;·&nbsp; (304) 555-0134</p>
+            </div>
+          </div>
+        </div>
+      </div>
+ 
+      <!-- UPCOMING APPOINTMENTS -->
+      <div class="card">
+        <div class="card-header">
+          <span class="icon">📅</span> Upcoming Appointments
+        </div>
+        <div class="card-body">
+ 
+          <div class="appointment">
+            <div class="appt-date-box">
+              <div class="month">Apr</div>
+              <div class="day">10</div>
+            </div>
+            <div class="appt-info">
+              <h3>Annual Physical Exam</h3>
+              <p>Dr. Samuel Ortega &nbsp;·&nbsp; 10:00 AM</p>
+              <p>Main Campus – Room 204</p>
+            </div>
+            <span class="appt-badge badge-confirmed">Confirmed</span>
+          </div>
+ 
+          <div class="appointment">
+            <div class="appt-date-box">
+              <div class="month">Apr</div>
+              <div class="day">22</div>
+            </div>
+            <div class="appt-info">
+              <h3>Blood Work Follow-Up</h3>
+              <p>Dr. Linda Chow &nbsp;·&nbsp; 2:30 PM</p>
+              <p>Lab Services – Floor 1</p>
+            </div>
+            <span class="appt-badge badge-confirmed">Confirmed</span>
+          </div>
+ 
+          <div class="appointment">
+            <div class="appt-date-box">
+              <div class="month">May</div>
+              <div class="day">5</div>
+            </div>
+            <div class="appt-info">
+              <h3>Dermatology Consultation</h3>
+              <p>Dr. Marcus Webb &nbsp;·&nbsp; 11:15 AM</p>
+              <p>West Wing – Suite 310</p>
+            </div>
+            <span class="appt-badge badge-pending">Pending</span>
+          </div>
+ 
+        </div>
+      </div>
+ 
+      <!-- LAB RESULTS -->
+      <div class="card">
+        <div class="card-header">
+          <span class="icon">🧪</span> Recent Lab Results
+        </div>
+        <div class="card-body" style="padding: 0;">
+          <table class="lab-table">
+            <thead>
+              <tr>
+                <th>Test</th>
+                <th>Result</th>
+                <th>Range</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Glucose</td>
+                <td>95 mg/dL</td>
+                <td>70–100</td>
+                <td><span class="status-normal">Normal</span></td>
+                <td>Mar 28</td>
+              </tr>
+              <tr>
+                <td>Hemoglobin</td>
+                <td>11.2 g/dL</td>
+                <td>12.0–16.0</td>
+                <td><span class="status-low">Low</span></td>
+                <td>Mar 28</td>
+              </tr>
+              <tr>
+                <td>Cholesterol</td>
+                <td>218 mg/dL</td>
+                <td>&lt;200</td>
+                <td><span class="status-high">High</span></td>
+                <td>Mar 28</td>
+              </tr>
+              <tr>
+                <td>TSH</td>
+                <td>2.1 mIU/L</td>
+                <td>0.4–4.0</td>
+                <td><span class="status-normal">Normal</span></td>
+                <td>Mar 28</td>
+              </tr>
+              <tr>
+                <td>Vitamin D</td>
+                <td>—</td>
+                <td>20–50 ng/mL</td>
+                <td><span class="status-pending">Pending</span></td>
+                <td>Apr 1</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+ 
+    </div><!-- end .grid -->
+  </div><!-- end .page-wrapper -->
+ 
+  <footer>
+    &copy; 2026 Green Valley Medical Center &nbsp;·&nbsp; Patient Portal &nbsp;·&nbsp; For medical emergencies, call <strong>911</strong>
+  </footer>
+ 
+</body>
+</html>
