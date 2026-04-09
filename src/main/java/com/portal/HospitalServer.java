@@ -30,7 +30,7 @@ public class HospitalServer {
 
                 // Prepare SQL statement to get the password for the given username
                 PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT password FROM Account WHERE user_name = ?"
+                    "SELECT password, role FROM Account WHERE user_name = ?"
                 );
                 stmt.setString(1, username);
 
@@ -43,7 +43,10 @@ public class HospitalServer {
 
                     // Compare the provided password with the one from the database
                     if (realPassword.equals(password)) {
-                        ctx.result("<h1>Welcome, " + username + "!</h1><p>You are logged in!</p>");
+                        ctx.sessionAttribute("username", username);
+                        ctx.sessionAttribute("role", rs.getString("role"));
+
+                        ctx.result("<h1>Welcome, " + username + "!</h1>");
                     } else {// Wrong password
                         ctx.result("<h2>Wrong password</h2>");
                     }
@@ -123,19 +126,36 @@ public class HospitalServer {
             }
         });
         app.get("/messages/{username}", ctx -> {
-            String username = ctx.pathParam("username");
+            String patientUsername = ctx.pathParam("username");
+            String loggedInUser = ctx.sessionAttribute("username");
+            String role = ctx.sessionAttribute("role");
+
+            if (role == null) {
+                ctx.status(401).result("Not logged in");
+                return;
+            }
+
+    // Patients can only view their own messages
+            if (role.equals("PATIENT") && !patientUsername.equals(loggedInUser)) {
+                ctx.status(403).result("Access denied");
+                return;
+            }
+
+    // Doctors & Nurses allowed
+            if (!hasRole(ctx, "DOCTOR", "NURSE", "ADMIN", "PATIENT")) {
+                ctx.status(403).result("Access denied");
+                return;
+            }
 
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
                  PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT sender, body, created_at FROM Message " +
-                     "WHERE patient_username = ? ORDER BY created_at DESC"
+                     "SELECT sender, body, created_at FROM Message WHERE patient_username = ? ORDER BY created_at DESC"
                  )) {
 
-                stmt.setString(1, username);
+                stmt.setString(1, patientUsername);
                 ResultSet rs = stmt.executeQuery();
 
                 var messages = new java.util.ArrayList<java.util.Map<String, String>>();
-
                 while (rs.next()) {
                     var msg = new java.util.HashMap<String, String>();
                     msg.put("sender", rs.getString("sender"));
@@ -145,26 +165,38 @@ public class HospitalServer {
                 }
 
                 ctx.json(messages);
-
+        
             } catch (SQLException e) {
                 ctx.status(500).result("Database error");
             }
         });
         app.post("/messages", ctx -> {
+            String role = ctx.sessionAttribute("role");
+            String sender = ctx.sessionAttribute("username");
+
+            if (role == null || sender == null) {
+                ctx.status(401).result("Not logged in");
+                return;
+            }
+
             String patientUsername = ctx.formParam("patient");
-            String sender = ctx.formParam("sender");
             String recipient = ctx.formParam("recipient");
             String body = ctx.formParam("body");
 
-            if (patientUsername == null || sender == null || body == null) {
-                ctx.status(400).result("Missing fields");
+    // Patients cannot message other patients
+            if (role.equals("PATIENT") && recipient.equalsIgnoreCase("PATIENT")) {
+                ctx.status(403).result("Patients cannot message other patients");
+                return;
+            }
+
+            if (!hasRole(ctx, "DOCTOR", "NURSE", "ADMIN", "PATIENT")) {
+                ctx.status(403).result("Access denied");
                 return;
             }
 
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
                  PreparedStatement stmt = conn.prepareStatement(
-                     "INSERT INTO Message (patient_username, sender, recipient, body) " +
-                     "VALUES (?, ?, ?, ?)"
+                     "INSERT INTO Message (patient_username, sender, recipient, body) VALUES (?, ?, ?, ?)"
                  )) {
 
                 stmt.setString(1, patientUsername);
@@ -179,6 +211,7 @@ public class HospitalServer {
                 ctx.status(500).result("Database error");
             }
         });
+
     }
 
     private static boolean updatePatientAccount(String username, String password, String email, Integer age, String ssn) throws SQLException {
@@ -224,5 +257,16 @@ public class HospitalServer {
             // don't hide what happened; caller can decide to show error
             throw ex;
         }
+    }
+    private static boolean hasRole(io.javalin.http.Context ctx, String... allowedRoles) {
+        String role = ctx.sessionAttribute("role");
+        if (role == null) return false;
+
+        for (String allowed : allowedRoles) {
+            if (role.equalsIgnoreCase(allowed)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
