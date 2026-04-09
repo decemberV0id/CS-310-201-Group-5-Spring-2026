@@ -1,6 +1,10 @@
 # CS-310-201-Group-5-Spring-2026
 CS-310-201 Group Project (Spring 2026)
 
+download the code base from the github
+https://github.com/decemberV0id/CS-310-201-Group-5-Spring-2026
+
+put the code base into a vscode project
 
 run the java file HospitalServer
 location:
