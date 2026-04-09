@@ -239,7 +239,7 @@ document.getElementById("sendModal").onclick = async () => {
 
   const formData = new URLSearchParams();
   formData.append("patient", patientUsername);
-  String sender = ctx.sessionAttribute("username"); // or logged-in user
+  String: sender = ctx.sessionAttribute("username"); // or logged-in user
   formData.append("recipient", recipient);
   formData.append("body", body);
 
