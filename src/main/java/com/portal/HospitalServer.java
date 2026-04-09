@@ -122,6 +122,63 @@ public class HospitalServer {
                 ctx.result("<h2>Database problem: " + ex.getMessage() + "</h2>");
             }
         });
+        app.get("/messages/{username}", ctx -> {
+            String username = ctx.pathParam("username");
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+                 PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT sender, body, created_at FROM Message " +
+                     "WHERE patient_username = ? ORDER BY created_at DESC"
+                 )) {
+
+                stmt.setString(1, username);
+                ResultSet rs = stmt.executeQuery();
+
+                var messages = new java.util.ArrayList<java.util.Map<String, String>>();
+
+                while (rs.next()) {
+                    var msg = new java.util.HashMap<String, String>();
+                    msg.put("sender", rs.getString("sender"));
+                    msg.put("body", rs.getString("body"));
+                    msg.put("created_at", rs.getString("created_at"));
+                    messages.add(msg);
+                }
+
+                ctx.json(messages);
+
+            } catch (SQLException e) {
+                ctx.status(500).result("Database error");
+            }
+        });
+        app.post("/messages", ctx -> {
+            String patientUsername = ctx.formParam("patient");
+            String sender = ctx.formParam("sender");
+            String recipient = ctx.formParam("recipient");
+            String body = ctx.formParam("body");
+
+            if (patientUsername == null || sender == null || body == null) {
+                ctx.status(400).result("Missing fields");
+                return;
+            }
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+                 PreparedStatement stmt = conn.prepareStatement(
+                     "INSERT INTO Message (patient_username, sender, recipient, body) " +
+                     "VALUES (?, ?, ?, ?)"
+                 )) {
+
+                stmt.setString(1, patientUsername);
+                stmt.setString(2, sender);
+                stmt.setString(3, recipient);
+                stmt.setString(4, body);
+                stmt.executeUpdate();
+
+                ctx.result("Message sent");
+
+            } catch (SQLException e) {
+                ctx.status(500).result("Database error");
+            }
+        });
     }
 
     private static boolean updatePatientAccount(String username, String password, String email, Integer age, String ssn) throws SQLException {
