@@ -166,25 +166,7 @@
     <h3>Patient: John Doe • DOB: XX/XX/XXXX</h3>
   </div>
 
-  <div class="messages">
-    <div class="message" tabindex="0">
-      <div class="message-header">From: Dr. Thompson</div>
-      <div class="timestamp">March 26, 2026 at 4:18 PM</div>
-      <div class="message-body">
-        Please review the patient's blood pressure readings and confirm
-        whether medication adjustments are necessary.
-      </div>
-    </div>
-
-    <div class="message" tabindex="0">
-      <div class="message-header">From: Nurse Allen</div>
-      <div class="timestamp">March 27, 2026 at 9:04 AM</div>
-      <div class="message-body">
-        The patient reports mild dizziness this morning.
-        Vitals have been entered into the chart.
-      </div>
-    </div>
-  </div>
+  <div class="messages" id="messagesContainer"></div>
 
   <!-- Compose Bar (single click target) -->
   <div class="compose" id="composeBar">
@@ -212,32 +194,71 @@
 </div>
 
 <script>
-  // Message selection
-  document.querySelectorAll('.message').forEach(msg => {
-    msg.addEventListener('click', () => {
-      document.querySelectorAll('.message')
-        .forEach(m => m.classList.remove('selected'));
-      msg.classList.add('selected');
-    });
+const patientUsername = "johndoe";
+const container = document.getElementById("messagesContainer");
+
+/* Load messages */
+async function loadMessages() {
+  const res = await fetch(`/messages/${patientUsername}`);
+  const messages = await res.json();
+
+  container.innerHTML = "";
+
+  messages.forEach(msg => {
+    const div = document.createElement("div");
+    div.className = "message";
+    div.tabIndex = 0;
+
+    div.innerHTML = `
+      <div class="message-header">From: ${msg.sender}</div>
+      <div class="timestamp">${new Date(msg.created_at).toLocaleString()}</div>
+      <div class="message-body">${msg.body}</div>
+    `;
+
+    div.onclick = () => {
+      document.querySelectorAll(".message")
+        .forEach(m => m.classList.remove("selected"));
+      div.classList.add("selected");
+    };
+
+    container.appendChild(div);
+  });
+}
+
+/* Modal logic */
+const modal = document.getElementById("messageModal");
+const composeBar = document.getElementById("composeBar");
+
+composeBar.onclick = () => modal.style.display = "flex";
+document.getElementById("cancelModal").onclick = closeModal;
+
+/* Send message */
+document.getElementById("sendModal").onclick = async () => {
+  const recipient = document.getElementById("modalTo").value;
+  const body = document.getElementById("modalMessage").value;
+
+  const formData = new URLSearchParams();
+  formData.append("patient", patientUsername);
+  formData.append("sender", "Dr. Thompson"); // or logged-in user
+  formData.append("recipient", recipient);
+  formData.append("body", body);
+
+  await fetch("/messages", {
+    method: "POST",
+    body: formData
   });
 
-  // Modal logic
-  const modal = document.getElementById('messageModal');
-  const composeBar = document.getElementById('composeBar');
+  closeModal();
+  loadMessages();
+};
 
-  composeBar.addEventListener('click', () => {
-    modal.style.display = 'flex';
-    setTimeout(() => document.getElementById('modalTo').focus(), 0);
-  });
+function closeModal() {
+  modal.style.display = "none";
+  document.getElementById("modalTo").value = "";
+  document.getElementById("modalMessage").value = "";
+}
 
-  document.getElementById('cancelModal').onclick = closeModal;
-  document.getElementById('sendModal').onclick = closeModal;
-
-  function closeModal() {
-    modal.style.display = 'none';
-    modal.querySelector('input').value = '';
-    modal.querySelector('textarea').value = '';
-  }
+loadMessages();
 </script>
 
 </body>
