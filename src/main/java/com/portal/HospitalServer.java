@@ -4,7 +4,7 @@ import io.javalin.Javalin;
 import java.sql.*;
 
 public class HospitalServer {
-
+    public static String currentUser = "johnm";
     public static void main(String[] args) {
 
         Javalin app = Javalin.create(config -> {
@@ -45,8 +45,9 @@ public class HospitalServer {
                     if (realPassword.equals(password)) {
                         ctx.sessionAttribute("username", username);
                         ctx.sessionAttribute("role", rs.getString("role"));
-
+                        currentUser = username;
                         ctx.result("<h1>Welcome, " + username + "!</h1>");
+                        System.out.println("User " + username + " logged in with role " + rs.getString("role"));
                     } else {// Wrong password
                         ctx.result("<h2>Wrong password</h2>");
                     }
