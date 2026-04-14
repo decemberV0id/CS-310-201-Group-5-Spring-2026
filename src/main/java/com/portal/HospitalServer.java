@@ -184,92 +184,119 @@ public class HospitalServer {
         });
         
         app.get("/messages/{username}", ctx -> {
-            String patientUsername = ctx.pathParam("username");
+            String targetUsername = ctx.pathParam("username");
             String loggedInUser = ctx.sessionAttribute("username");
             String role = ctx.sessionAttribute("role");
 
-            if (role == null) {
+            if (role == null || loggedInUser == null) {
                 ctx.status(401).result("Not logged in");
                 return;
             }
 
-    // Patients can only view their own messages
-            if (role.equals("PATIENT") && !patientUsername.equals(loggedInUser)) {
+            // Patients can only see their own messages
+            if (role.equalsIgnoreCase("patient") && !targetUsername.equals(loggedInUser)) {
                 ctx.status(403).result("Access denied");
                 return;
             }
 
-    // Doctors & Nurses allowed
-            if (!hasRole(ctx, "DOCTOR", "NURSE", "ADMIN", "PATIENT")) {
+            if (!hasRole(ctx, "doctor", "nurse", "admin", "patient")) {
                 ctx.status(403).result("Access denied");
                 return;
             }
 
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-                 PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT sender, body, created_at FROM Message WHERE patient_username = ? ORDER BY created_at DESC"
-                 )) {
+                PreparedStatement stmt = conn.prepareStatement(
+                    """
+                    SELECT
+                        sender_user_name,
+                        receiver_user_name,
+                        message_text,
+                        sent_at
+                    FROM Messages
+                    WHERE sender_user_name = ?
+                        OR receiver_user_name = ?
+                    ORDER BY sent_at DESC
+                    """
+                )) {
 
-                stmt.setString(1, patientUsername);
+                stmt.setString(1, targetUsername);
+                stmt.setString(2, targetUsername);
+
                 ResultSet rs = stmt.executeQuery();
 
                 var messages = new java.util.ArrayList<java.util.Map<String, String>>();
+
                 while (rs.next()) {
                     var msg = new java.util.HashMap<String, String>();
-                    msg.put("sender", rs.getString("sender"));
-                    msg.put("body", rs.getString("body"));
-                    msg.put("created_at", rs.getString("created_at"));
+                    msg.put("sender", rs.getString("sender_user_name"));
+                    msg.put("body", rs.getString("message_text"));
+                    msg.put("created_at", rs.getString("sent_at"));
                     messages.add(msg);
                 }
 
                 ctx.json(messages);
-        
+
             } catch (SQLException e) {
+                e.printStackTrace();
                 ctx.status(500).result("Database error");
             }
         });
         
         app.post("/messages", ctx -> {
-            String role = ctx.sessionAttribute("role");
-            String sender = ctx.sessionAttribute("username");
+    ?, ?)    String sender = ctx.sessionAttribute("username");
+             """
+         )) {
 
-            if (role == null || sender == null) {
-                ctx.status(401).result("Not logged in");
-                return;
-            }
+        stmt.setString(1, sender);
+        stmt.setString(2, recipient);
+        stmt.setString(3, body);
+        stmt.executeUpdate();
 
-            String patientUsername = ctx.formParam("patient");
-            String recipient = ctx.formParam("recipient");
-            String body = ctx.formParam("body");
+        ctx.result("Message sent");
+
+    } catch (SQLException e) {
+        e.printStackTrace();
+        ctx.status(500).result("Database error");
+    }
+});
+    String role = ctx.sessionAttribute("role");
+
+    if (sender == null || role == null) {
+        ctx.status(401).result("Not logged in");
+        return;
+    }
+
+    String recipient = ctx.formParam("recipient");
+    String body = ctx.formParam("body");
+
+    if (recipient == null || body == null || body.isBlank()) {
+        ctx.status(400).result("Invalid message data");
+        return;
+    }
 
     // Patients cannot message other patients
-            if (role.equals("PATIENT") && recipient.equalsIgnoreCase("PATIENT")) {
+    if (role.equalsIgnoreCase("patient")) {
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+             PreparedStatement roleCheck = conn.prepareStatement(
+                 "SELECT role FROM Account WHERE user_name = ?"
+             )) {
+
+            roleCheck.setString(1, recipient);
+            ResultSet rs = roleCheck.executeQuery();
+
+            if (rs.next() && rs.getString("role").equalsIgnoreCase("patient")) {
                 ctx.status(403).result("Patients cannot message other patients");
                 return;
             }
+        }
+    }
 
-            if (!hasRole(ctx, "DOCTOR", "NURSE", "ADMIN", "PATIENT")) {
-                ctx.status(403).result("Access denied");
-                return;
-            }
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+         PreparedStatement stmt = conn.prepareStatement(
+             """
+             INSERT INTO Messages
+             (sender_user_name, receiver_user_name, message_text)
 
-            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-                 PreparedStatement stmt = conn.prepareStatement(
-                     "INSERT INTO Message (patient_username, sender, recipient, body) VALUES (?, ?, ?, ?)"
-                 )) {
-
-                stmt.setString(1, patientUsername);
-                stmt.setString(2, sender);
-                stmt.setString(3, recipient);
-                stmt.setString(4, body);
-                stmt.executeUpdate();
-
-                ctx.result("Message sent");
-
-            } catch (SQLException e) {
-                ctx.status(500).result("Database error");
-            }
-        });
 
     }
 
