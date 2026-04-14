@@ -61,8 +61,6 @@ public class HospitalServer {
         });
 
         app.post("/calendar", ctx -> {
-            System.out.println("=== /calendar API CALLED ===");
-            System.out.println("Current user = " + currentUser);
 
             String username = currentUser;
 
@@ -112,7 +110,6 @@ public class HospitalServer {
 
             json.append("}");
 
-            System.out.println("Found " + count + " appointments. Sending JSON: " + json);
             ctx.result(json.toString());   // Send raw JSON string instead of ctx.json()
         });
 
