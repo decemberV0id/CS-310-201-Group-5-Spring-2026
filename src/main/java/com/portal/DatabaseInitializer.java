@@ -112,6 +112,18 @@ public class DatabaseInitializer {
                         FOREIGN KEY (doctor_user_name) REFERENCES Account(user_name)
                     )
                 """);
+
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS Medication (
+                        medication_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        patient_account_id INTEGER NOT NULL,
+                        medicine_name TEXT NOT NULL,
+                        frequency TEXT NOT NULL,
+                        date_prescribed DATE NOT NULL,
+                        notes TEXT,
+                        FOREIGN KEY (patient_account_id) REFERENCES PatientAccount(patient_account_id)
+                    )
+                """);
             }
 
             // ==================== INSERT SAMPLE DATA ====================
@@ -209,7 +221,7 @@ public class DatabaseInitializer {
                 pstmt.executeUpdate();
             }
 
-            // 5. Insert 3 Appointments in April for John Miller
+            // 5. Insert 3 Appointments in April for John Marshall
             int patientAccountId = getPatientAccountId(conn, "johnm");
 
             try (PreparedStatement pstmt = conn.prepareStatement(
@@ -248,6 +260,134 @@ public class DatabaseInitializer {
                 pstmt.setString(6, "09:15");
                 pstmt.setInt(7, 30);
                 pstmt.setString(8, "Discuss treatment plan and medication adjustment");
+                pstmt.executeUpdate();
+            }
+
+            // ==================== NEW: Second patient (janed) ====================
+
+            // 6. Insert janed (patient) - new patient account
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "INSERT OR IGNORE INTO Account (user_name, email, password, role) VALUES (?, ?, ?, ?)")) {
+                pstmt.setString(1, "janed");
+                pstmt.setString(2, "jane.doe@example.com");
+                pstmt.setString(3, "secret2026");
+                pstmt.setString(4, "patient");
+                pstmt.executeUpdate();
+            }
+
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "INSERT OR IGNORE INTO PatientAccount (user_name, age, ssn, height, first_name, last_name, previous_clinic, preconditions) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                pstmt.setString(1, "janed");
+                pstmt.setInt(2, 28);
+                pstmt.setString(3, "987-65-4321");
+                pstmt.setDouble(4, 162.3);
+                pstmt.setString(5, "Jane");
+                pstmt.setString(6, "Doe");
+                pstmt.setString(7, "None");
+                pstmt.setString(8, "Asthma");
+                pstmt.executeUpdate();
+            }
+
+            // 7. Insert 4 test results for janed
+            int janePatientId = getPatientAccountId(conn, "janed");
+
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "INSERT OR IGNORE INTO LabTestResult " +
+                    "(patient_account_id, test_name, lab_name, lab_results, test_date, notes) " +
+                    "VALUES (?, ?, ?, ?, ?, ?)")) {
+
+                // Test 1 - April 1
+                pstmt.setInt(1, janePatientId);
+                pstmt.setString(2, "Spirometry");
+                pstmt.setString(3, "Pulmonary Lab");
+                pstmt.setString(4, "FEV1: 85% predicted, FVC: 90% predicted");
+                pstmt.setString(5, "2026-04-01 10:00:00");
+                pstmt.setString(6, "Mild obstructive pattern consistent with asthma");
+                pstmt.executeUpdate();
+
+                // Test 2 - April 3
+                pstmt.setInt(1, janePatientId);
+                pstmt.setString(2, "Allergy Panel");
+                pstmt.setString(3, "Main Lab");
+                pstmt.setString(4, "Positive for dust mites and pollen");
+                pstmt.setString(5, "2026-04-03 11:30:00");
+                pstmt.setString(6, "Environmental triggers identified");
+                pstmt.executeUpdate();
+
+                // Test 3 - April 10
+                pstmt.setInt(1, janePatientId);
+                pstmt.setString(2, "Complete Blood Count (CBC)");
+                pstmt.setString(3, "Main Lab");
+                pstmt.setString(4, "WBC: 6.5, RBC: 4.5, Hemoglobin: 13.8");
+                pstmt.setString(5, "2026-04-10 09:00:00");
+                pstmt.setString(6, "Normal results");
+                pstmt.executeUpdate();
+
+                // Test 4 - April 12
+                pstmt.setInt(1, janePatientId);
+                pstmt.setString(2, "Chest X-Ray");
+                pstmt.setString(3, "Radiology");
+                pstmt.setString(4, "No acute abnormalities, mild hyperinflation");
+                pstmt.setString(5, "2026-04-12 14:00:00");
+                pstmt.setString(6, "Consistent with asthma");
+                pstmt.executeUpdate();
+            }
+
+            // 8. Insert 1 Appointment in April for Jane Doe
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "INSERT OR IGNORE INTO Appointment " +
+                    "(patient_account_id, doctor_user_name, type, doctorname, event_date, event_time, duration_minutes, description) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+
+                pstmt.setInt(1, janePatientId);
+                pstmt.setString(2, "drsmith");
+                pstmt.setString(3, "Consultation");
+                pstmt.setString(4, "Dr. Smith");
+                pstmt.setString(5, "2026-04-22");
+                pstmt.setString(6, "11:00");
+                pstmt.setInt(7, 45);
+                pstmt.setString(8, "Initial consultation for asthma symptoms and management plan");
+                pstmt.executeUpdate();
+            }
+
+            // 9. Insert medications for both patients (johnm + janed)
+            int johnPatientIdM = getPatientAccountId(conn, "johnm");
+            int janePatientIdM = getPatientAccountId(conn, "janed");
+
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "INSERT OR IGNORE INTO Medication " +
+                    "(patient_account_id, medicine_name, frequency, date_prescribed, notes) " +
+                    "VALUES (?, ?, ?, ?, ?)")) {
+
+                // Medications for John Miller (hypertension focus)
+                pstmt.setInt(1, johnPatientIdM);
+                pstmt.setString(2, "Lisinopril");
+                pstmt.setString(3, "Once daily");
+                pstmt.setString(4, "2026-03-10");
+                pstmt.setString(5, "For hypertension management - 10mg");
+                pstmt.executeUpdate();
+
+                pstmt.setInt(1, johnPatientIdM);
+                pstmt.setString(2, "Atorvastatin");
+                pstmt.setString(3, "Once daily at bedtime");
+                pstmt.setString(4, "2026-03-20");
+                pstmt.setString(5, "For cholesterol management - 20mg");
+                pstmt.executeUpdate();
+
+                // Medications for Jane Doe (asthma focus)
+                pstmt.setInt(1, janePatientIdM);
+                pstmt.setString(2, "Fluticasone (Flovent)");
+                pstmt.setString(3, "Twice daily");
+                pstmt.setString(4, "2026-04-05");
+                pstmt.setString(5, "Daily controller inhaler - 110mcg");
+                pstmt.executeUpdate();
+
+                pstmt.setInt(1, janePatientIdM);
+                pstmt.setString(2, "Albuterol Inhaler");
+                pstmt.setString(3, "As needed for symptoms");
+                pstmt.setString(4, "2026-04-05");
+                pstmt.setString(5, "Rescue inhaler - 2 puffs every 4-6 hours PRN");
                 pstmt.executeUpdate();
             }
 
