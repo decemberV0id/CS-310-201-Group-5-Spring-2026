@@ -59,6 +59,65 @@ public class HospitalServer {
                 ctx.result("<h2>Database problem :(</h2>");
             }
         });
+
+        app.post("/calendar", ctx -> {
+            System.out.println("=== /calendar API CALLED ===");
+            System.out.println("Current user = " + currentUser);
+
+            String username = currentUser;
+
+            if (username == null || username.trim().isEmpty()) {
+                System.out.println("ERROR: No currentUser set!");
+                ctx.status(401).result("{\"error\": \"No user logged in\"}");
+                return;
+            }
+
+            StringBuilder json = new StringBuilder("{");
+            boolean first = true;
+            int count = 0;
+
+            String sql = "SELECT a.event_date, a.event_time, a.description, a.doctorname " +
+                         "FROM Appointment a " +
+                         "JOIN PatientAccount p ON a.patient_account_id = p.patient_account_id " +
+                         "WHERE p.user_name = ? " +
+                         "ORDER BY a.event_date, a.event_time";
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                pstmt.setString(1, username);
+
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        String dateKey = rs.getString("event_date");
+                        String time = rs.getString("event_time") != null ? rs.getString("event_time") : "";
+                        String doctor = rs.getString("doctorname") != null ? rs.getString("doctorname") : "Dr. Smith";
+                        String desc = rs.getString("description") != null ? rs.getString("description") : "Appointment";
+
+                        String eventText = time + " – " + doctor + "<br>" + desc;
+
+                        if (!first) json.append(",");
+                        json.append("\"").append(dateKey).append("\":\"").append(eventText.replace("\"", "\\\"")).append("\"");
+
+                        first = false;
+                        count++;
+                    }
+                }
+            } catch (SQLException e) {
+                System.out.println("Database error: " + e.getMessage());
+                e.printStackTrace();
+                ctx.status(500).result("{\"error\": \"Database error\"}");
+                return;
+            }
+
+            json.append("}");
+
+            System.out.println("Found " + count + " appointments. Sending JSON: " + json);
+            ctx.result(json.toString());   // Send raw JSON string instead of ctx.json()
+        });
+
+
+
         app.post("/register", ctx -> {
             String username = ctx.formParam("username");
             String hashedPw = ctx.formParam("password");
@@ -126,6 +185,7 @@ public class HospitalServer {
                 ctx.result("<h2>Database problem: " + ex.getMessage() + "</h2>");
             }
         });
+        
         app.get("/messages/{username}", ctx -> {
             String patientUsername = ctx.pathParam("username");
             String loggedInUser = ctx.sessionAttribute("username");
@@ -171,6 +231,7 @@ public class HospitalServer {
                 ctx.status(500).result("Database error");
             }
         });
+        
         app.post("/messages", ctx -> {
             String role = ctx.sessionAttribute("role");
             String sender = ctx.sessionAttribute("username");
