@@ -243,61 +243,60 @@ public class HospitalServer {
         });
         
         app.post("/messages", ctx -> {
-    ?, ?)    String sender = ctx.sessionAttribute("username");
-             """
-         )) {
+            String sender = ctx.sessionAttribute("username");
+            String role = ctx.sessionAttribute("role");
 
-        stmt.setString(1, sender);
-        stmt.setString(2, recipient);
-        stmt.setString(3, body);
-        stmt.executeUpdate();
-
-        ctx.result("Message sent");
-
-    } catch (SQLException e) {
-        e.printStackTrace();
-        ctx.status(500).result("Database error");
-    }
-});
-    String role = ctx.sessionAttribute("role");
-
-    if (sender == null || role == null) {
-        ctx.status(401).result("Not logged in");
-        return;
-    }
-
-    String recipient = ctx.formParam("recipient");
-    String body = ctx.formParam("body");
-
-    if (recipient == null || body == null || body.isBlank()) {
-        ctx.status(400).result("Invalid message data");
-        return;
-    }
-
-    // Patients cannot message other patients
-    if (role.equalsIgnoreCase("patient")) {
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-             PreparedStatement roleCheck = conn.prepareStatement(
-                 "SELECT role FROM Account WHERE user_name = ?"
-             )) {
-
-            roleCheck.setString(1, recipient);
-            ResultSet rs = roleCheck.executeQuery();
-
-            if (rs.next() && rs.getString("role").equalsIgnoreCase("patient")) {
-                ctx.status(403).result("Patients cannot message other patients");
+            if (sender == null || role == null) {
+                ctx.status(401).result("Not logged in");
                 return;
             }
-        }
-    }
 
-    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-         PreparedStatement stmt = conn.prepareStatement(
-             """
-             INSERT INTO Messages
-             (sender_user_name, receiver_user_name, message_text)
+            String recipient = ctx.formParam("recipient");
+            String body = ctx.formParam("body");
 
+            if (recipient == null || body == null || body.isBlank()) {
+                ctx.status(400).result("Invalid message data");
+                return;
+            }
 
+            // Patients cannot message other patients
+            if (role.equalsIgnoreCase("patient")) {
+                try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+                    PreparedStatement roleCheck = conn.prepareStatement(
+                        "SELECT role FROM Account WHERE user_name = ?"
+                    )) {
+
+                    roleCheck.setString(1, recipient);
+                    ResultSet rs = roleCheck.executeQuery();
+
+                    if (rs.next() && rs.getString("role").equalsIgnoreCase("patient")) {
+                        ctx.status(403).result("Patients cannot message other patients");
+                        return;
+                    }
+                }
+            }
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+                PreparedStatement stmt = conn.prepareStatement(
+                    """
+                    INSERT INTO Messages
+                    (sender_user_name, receiver_user_name, message_text)
+                    VALUES (?, ?, ?)
+                    """
+                )) {
+
+                stmt.setString(1, sender);
+                stmt.setString(2, recipient);
+                stmt.setString(3, body);
+                stmt.executeUpdate();
+
+                ctx.result("Message sent");
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+                ctx.status(500).result("Database error");
+            }
+        });
     }
 
     private static boolean updatePatientAccount(String username, String password, String email, Integer age, String ssn) throws SQLException {
