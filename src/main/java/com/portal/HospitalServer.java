@@ -182,66 +182,6 @@ public class HospitalServer {
                 ctx.result("<h2>Database problem: " + ex.getMessage() + "</h2>");
             }
         });
-        
-        app.get("/messages/{username}", ctx -> {
-            String targetUsername = ctx.pathParam("username");
-            String loggedInUser = ctx.sessionAttribute("username");
-            String role = ctx.sessionAttribute("role");
-
-            if (role == null || loggedInUser == null) {
-                ctx.status(401).result("Not logged in");
-                return;
-            }
-
-            // Patients can only see their own messages
-            if (role.equalsIgnoreCase("patient") && !targetUsername.equals(loggedInUser)) {
-                ctx.status(403).result("Access denied");
-                return;
-            }
-
-            if (!hasRole(ctx, "doctor", "nurse", "admin", "patient")) {
-                ctx.status(403).result("Access denied");
-                return;
-            }
-
-            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-                PreparedStatement stmt = conn.prepareStatement(
-                    """
-                    SELECT
-                        sender_user_name,
-                        receiver_user_name,
-                        message_text,
-                        sent_at
-                    FROM Messages
-                    WHERE sender_user_name = ?
-                        OR receiver_user_name = ?
-                    ORDER BY sent_at DESC
-                    """
-                )) {
-
-                stmt.setString(1, targetUsername);
-                stmt.setString(2, targetUsername);
-
-                ResultSet rs = stmt.executeQuery();
-
-                var messages = new java.util.ArrayList<java.util.Map<String, String>>();
-
-                while (rs.next()) {
-                    var msg = new java.util.HashMap<String, String>();
-                    msg.put("sender", rs.getString("sender_user_name"));
-                    msg.put("body", rs.getString("message_text"));
-                    msg.put("created_at", rs.getString("sent_at"));
-                    messages.add(msg);
-                }
-
-                ctx.json(messages);
-
-            } catch (SQLException e) {
-                e.printStackTrace();
-                ctx.status(500).result("Database error");
-            }
-        });
-        
         app.post("/messages", ctx -> {
             String sender = ctx.sessionAttribute("username");
             String role = ctx.sessionAttribute("role");
