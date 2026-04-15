@@ -1,66 +1,261 @@
-<!DOCTYPE html><!DOCTYPE html12px; background: #e9ecef; cursor: pointer; }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EHR Message Page</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f5f7;
+      color: #333;
+    }
+
+    .main {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      background: #ffffff;
+    }
+
+    .patient-banner {
+      padding: 15px 20px;
+      background: #e6eef4;
+      border-bottom: 1px solid #d3dce3;
+    }
+
+    .patient-banner h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .messages {
+      padding: 20px;
+      overflow-y: auto;
+      background: #f9fafb;
+    }
+
+    .message {
+      background: #ffffff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      border: 1px solid #e1e5e9;
+      cursor: pointer;
+    }
+
+    .message:hover {
+      border-color: #9fcbb1;
+    }
+
+    .message-header {
+      font-weight: bold;
+      color: #1e4f7b;
+    }
+
+    .timestamp {
+      font-size: 12px;
+      color: #777;
+    }
+
+    .message-body {
+      display: none;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+
+    .message.selected {
+      border: 2px solid #2e9f4f;
+      box-shadow: 0 0 0 2px rgba(46, 159, 79, 0.15);
+    }
+
+    .message.selected .message-body {
+      display: block;
+    }
+
+    /* Compose Bar */
+    .compose {
+      padding: 15px;
+      border-top: 1px solid #d3dce3;
+      background: #f5f7f9;
+      cursor: pointer;
+    }
+
+    .compose span {
+      color: #555;
+      font-size: 14px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal {
+      background: #ffffff;
+      width: 420px;
+      max-width: 90%;
+      padding: 20px;
+      border-radius: 6px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .modal h3 {
+      margin-top: 0;
+      color: #1e4f7b;
+    }
+
+    .modal label {
+      display: block;
+      margin-top: 12px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .modal input,
+    .modal textarea {
+      width: 100%;
+      margin-top: 5px;
+      padding: 8px;
+      border: 1px solid #c7d0d8;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .modal textarea {
+      height: 100px;
+      resize: none;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 15px;
+    }
+
+    .modal-actions button {
+      min-width: 90px;
+      padding: 10px 18px;
+    }
+
+    button.secondary {
+      background: #e1e5e9;
+      color: #333;
+    }
+
+    button.secondary:hover {
+      background: #cfd6dc;
+    }
   </style>
 </head>
 
 <body>
 
-<h2 style="padding:10px;">Inbox</h2>
-<div id="messagesContainer"></div>
+<div class="main">
 
-<div class="compose" id="composeBar">Click here to send a new message…</div>
+  <div class="patient-banner">
+    <h3>Patient: John Doe • DOB: XX/XX/XXXX</h3>
+  </div>
 
-<div id="modal" style="display:none;">
-  <input id="recipient" placeholder="Recipient"><br><br>
-  <textarea id="body"></textarea><br>
-  <button onclick="sendMessage()">Send</button>
-  <button onclick="closeModal()">Cancel</button>
+  <div class="messages" id="messagesContainer"></div>
+
+  <!-- Compose Bar (single click target) -->
+  <div class="compose" id="composeBar">
+    <span><i>Click here to send a new message…</i></span>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="messageModal">
+  <div class="modal">
+    <h3>New Message</h3>
+
+    <label for="modalTo">To</label>
+    <input id="modalTo" type="text" placeholder="Recipient" />
+
+    <label for="modalMessage">Message</label>
+    <textarea id="modalMessage" placeholder="Type your message…"></textarea>
+
+    <div class="modal-actions">
+      <button class="secondary" id="cancelModal" type="button">Cancel</button>
+      <button id="sendModal" type="button">Send</button>
+    </div>
+  </div>
 </div>
 
 <script>
+const patientUsername = "johndoe";
 const container = document.getElementById("messagesContainer");
-const modal = document.getElementById("modal");
 
+/* Load messages */
 async function loadMessages() {
-  const res = await fetch("/messages/me");
-  if (!res.ok) {
-    container.innerHTML = "<p>Error loading messages</p>";
-    return;
-  }
-
+  const res = await fetch(`/messages/${patientUsername}`);
   const messages = await res.json();
+
   container.innerHTML = "";
 
   messages.forEach(msg => {
     const div = document.createElement("div");
     div.className = "message";
+    div.tabIndex = 0;
+
     div.innerHTML = `
-      <strong>From:</strong> ${msg.sender}<br>
-      <small>${new Date(msg.created_at).toLocaleString()}</small>
+      <div class="message-header">From: ${msg.sender}</div>
+      <div class="timestamp">${new Date(msg.created_at).toLocaleString()}</div>
       <div class="message-body">${msg.body}</div>
     `;
-    div.onclick = () => div.classList.toggle("selected");
+
+    div.onclick = () => {
+      document.querySelectorAll(".message")
+        .forEach(m => m.classList.remove("selected"));
+      div.classList.add("selected");
+    };
+
     container.appendChild(div);
   });
 }
 
-document.getElementById("composeBar").onclick = () => modal.style.display = "block";
+/* Modal logic */
+const modal = document.getElementById("messageModal");
+const composeBar = document.getElementById("composeBar");
 
-function closeModal() {
-  modal.style.display = "none";
-}
+composeBar.onclick = () => modal.style.display = "flex";
+document.getElementById("cancelModal").onclick = closeModal;
 
-async function sendMessage() {
-  const recipient = document.getElementById("recipient").value;
-  const body = document.getElementById("body").value;
+/* Send message */
+document.getElementById("sendModal").onclick = async () => {
+  const recipient = document.getElementById("modalTo").value;
+  const body = document.getElementById("modalMessage").value;
 
-  const data = new URLSearchParams();
-  data.append("recipient", recipient);
-  data.append("body", body);
+  const formData = new URLSearchParams();
+  formData.append("patient", patientUsername);
+  String: sender = ctx.sessionAttribute("username"); // or logged-in user
+  formData.append("recipient", recipient);
+  formData.append("body", body);
 
-  await fetch("/messages", { method: "POST", body: data });
+  await fetch("/messages", {
+    method: "POST",
+    body: formData
+  });
 
   closeModal();
   loadMessages();
+};
+
+function closeModal() {
+  modal.style.display = "none";
+  document.getElementById("modalTo").value = "";
+  document.getElementById("modalMessage").value = "";
 }
 
 loadMessages();
@@ -68,14 +263,3 @@ loadMessages();
 
 </body>
 </html>
-
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>EHR Messages</title>
-  <style>
-    body { font-family: Arial; background: #f4f6f8; margin: 0; }
-    .message { background: white; padding: 12px; margin-bottom: 10px; border-radius: 5px; cursor: pointer; }
-    .message.selected { border: 2px solid #2e9f4f; }
-    .message-body { display: none; margin-top: 5px; }
-    .message.selected .message-body { display: block; }
