@@ -2,10 +2,7 @@ package com.portal;
 
 import io.javalin.Javalin;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
 
 public class HospitalServer {
     public static String currentUser = "johnm";
@@ -184,119 +181,137 @@ public class HospitalServer {
         });
         
         app.post("/messages", ctx -> {
-            String sender = ctx.sessionAttribute("username");
-            String role   = ctx.sessionAttribute("role");
-        
-            if (sender == null || role == null) {
-                ctx.status(401).result("Not logged in");
+            String username = currentUser;
+
+            if (username == null || username.trim().isEmpty()) {
+                ctx.status(401).result("No current user set");
                 return;
             }
-        
-            String recipient = ctx.formParam("recipient");
-            String body      = ctx.formParam("body");
-        
-            if (recipient == null || body == null ||
-                recipient.isBlank() || body.isBlank()) {
-                ctx.status(400).result("Invalid message data");
-                return;
-            }
-        
-            recipient = recipient.trim();
-            body = body.trim();
-        
+
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
-        
-                /* ============================
-                   Validate recipient + role
-                   ============================ */
-                String recipientRole;
-        
-                try (PreparedStatement roleCheck = conn.prepareStatement(
-                    "SELECT role FROM Account WHERE user_name = ?"
-                )) {
-                    roleCheck.setString(1, recipient);
-                    ResultSet rs = roleCheck.executeQuery();
-        
-                    if (!rs.next()) {
-                        ctx.status(404).result("Recipient not found");
-                        return;
+                try (Statement schemaStmt = conn.createStatement()) {
+                    schemaStmt.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS Messages (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            sender_user_name TEXT NOT NULL,
+                            receiver_user_name TEXT NOT NULL,
+                            message_text TEXT NOT NULL,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    );
+                }
+
+                boolean hasCreatedAt = false;
+                try (PreparedStatement colStmt = conn.prepareStatement("PRAGMA table_info(Messages)");
+                     ResultSet colRs = colStmt.executeQuery()) {
+                    while (colRs.next()) {
+                        String colName = colRs.getString("name");
+                        if ("created_at".equalsIgnoreCase(colName)) {
+                            hasCreatedAt = true;
+                            break;
+                        }
                     }
-        
-                    recipientRole = rs.getString("role");
                 }
-        
-                /* ============================
-                   Role enforcement
-                   ============================ */
-                if (role.equalsIgnoreCase("patient") &&
-                    recipientRole.equalsIgnoreCase("patient")) {
-                    ctx.status(403).result("Patients cannot message other patients");
-                    return;
+
+                String selectSql;
+                if (hasCreatedAt) {
+                    selectSql =
+                        "SELECT sender_user_name AS sender, " +
+                        "receiver_user_name AS recipient, " +
+                        "message_text, " +
+                        "created_at " +
+                        "FROM Messages " +
+                        "WHERE sender_user_name = ? OR receiver_user_name = ? " +
+                        "ORDER BY created_at ASC";
+                } else {
+                    selectSql =
+                        "SELECT sender_user_name AS sender, " +
+                        "receiver_user_name AS recipient, " +
+                        "message_text, " +
+                        "'' AS created_at " +
+                        "FROM Messages " +
+                        "WHERE sender_user_name = ? OR receiver_user_name = ?";
                 }
-        
-                /* ============================
-                   Insert message
-                   patient == sender
-                   ============================ */
-                try (PreparedStatement stmt = conn.prepareStatement(
-                    """
-                    INSERT INTO Messages
-                      (sender_user_name, receiver_user_name, message_text)
-                    VALUES (?, ?, ?)
-                    """
-                )) {
-                    stmt.setString(1, sender);     // patient identity
-                    stmt.setString(2, recipient);
-                    stmt.setString(3, body);
-                    stmt.executeUpdate();
+
+                PreparedStatement stmt = conn.prepareStatement(selectSql);
+                stmt.setString(1, username);
+                stmt.setString(2, username);
+
+                ResultSet rs = stmt.executeQuery();
+                StringBuilder json = new StringBuilder("[");
+                boolean first = true;
+
+                while (rs.next()) {
+                    if (!first) {
+                        json.append(",");
+                    }
+
+                    String sender = rs.getString("sender");
+                    if (sender == null) sender = "";
+                    sender = sender.replace("\\", "\\\\")
+                                   .replace("\"", "\\\"")
+                                   .replace("\n", "\\n")
+                                   .replace("\r", "\\r");
+
+                    String recipient = rs.getString("recipient");
+                    if (recipient == null) recipient = "";
+                    recipient = recipient.replace("\\", "\\\\")
+                                         .replace("\"", "\\\"")
+                                         .replace("\n", "\\n")
+                                         .replace("\r", "\\r");
+
+                    String body = rs.getString("message_text");
+                    if (body == null) body = "";
+                    body = body.replace("\\", "\\\\")
+                               .replace("\"", "\\\"")
+                               .replace("\n", "\\n")
+                               .replace("\r", "\\r");
+
+                    String createdAt = rs.getString("created_at");
+                    if (createdAt == null) createdAt = "";
+                    createdAt = createdAt.replace("\\", "\\\\")
+                                         .replace("\"", "\\\"")
+                                         .replace("\n", "\\n")
+                                         .replace("\r", "\\r");
+
+                    json.append("{")
+                        .append("\"sender\":\"").append(sender).append("\",")
+                        .append("\"recipient\":\"").append(recipient).append("\",")
+                        .append("\"body\":\"").append(body).append("\",")
+                        .append("\"created_at\":\"").append(createdAt).append("\"")
+                        .append("}");
+
+                    first = false;
                 }
-        
-                ctx.status(200).result("Message sent");
-        
+
+                json.append("]");
+
+                String safeUser = username.replace("\\", "\\\\")
+                                          .replace("\"", "\\\"")
+                                          .replace("\n", "\\n")
+                                          .replace("\r", "\\r");
+
+                String responseJson = "{\"currentUser\":\""
+                    + safeUser
+                    + "\",\"messages\":"
+                    + json
+                    + "}";
+
+                ctx.contentType("application/json");
+                ctx.result(responseJson);
+
+                rs.close();
+                stmt.close();
+
             } catch (SQLException e) {
                 e.printStackTrace();
-                ctx.status(500).result("Database error");
+                ctx.status(500).contentType("application/json")
+                   .result("{\"currentUser\":\"\",\"messages\":[]}");
             }
         });
-        app.get("/messages/:patient", ctx -> {
-    String patient = ctx.pathParam("patient");
-
-    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-         PreparedStatement stmt = conn.prepareStatement(
-            """
-            SELECT sender_user_name AS sender,
-                   receiver_user_name AS recipient,
-                   message_text,
-                   created_at
-            FROM Messages
-            WHERE sender_user_name = ?
-               OR receiver_user_name = ?
-            ORDER BY created_at DESC
-            """
-         )) {
-
-        stmt.setString(1, patient);
-        stmt.setString(2, patient);
-
-        ResultSet rs = stmt.executeQuery();
-        List<Map<String, Object>> messages = new ArrayList<>();
-
-        while (rs.next()) {
-            Map<String, Object> m = new HashMap<>();
-            m.put("sender", rs.getString("sender"));
-            m.put("recipient", rs.getString("recipient"));
-            m.put("body", rs.getString("message_text"));
-            m.put("created_at", rs.getString("created_at"));
-            messages.add(m);
-        }
-
-        ctx.json(messages);
-
-    } catch (SQLException e) {
-        e.printStackTrace();
-        ctx.status(500);
-    }
-});
+        
 
         
         app.post("/example", ctx -> {
