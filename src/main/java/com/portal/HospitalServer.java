@@ -246,8 +246,11 @@ public class HospitalServer {
 
 
             } catch (Exception e) {// Database connection or query error
-                ctx.result("<h2>Database problem :(</h2>");
+                ctx.result("<h2>Database problem :(</h2>");//respond with error message
+                return;
             }
+
+            ctx.result("hi");//final response to html
         });
 
     
