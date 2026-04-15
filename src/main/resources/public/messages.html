@@ -194,71 +194,67 @@
 </div>
 
 <script>
+<script>
+/*
+  ============================
+  Configuration
+  ============================
+*/
 const patientUsername = "johndoe";
-const container = document.getElementById("messagesContainer");
 
-/* Load messages */
+/*
+  ============================
+  DOM References
+  ============================
+*/
+const container   = document.getElementById("messagesContainer");
+const modal       = document.getElementById("messageModal");
+const composeBar  = document.getElementById("composeBar");
+const cancelBtn   = document.getElementById("cancelModal");
+const sendBtn     = document.getElementById("sendModal");
+const toInput     = document.getElementById("modalTo");
+const bodyInput   = document.getElementById("modalMessage");
+
+/*
+  ============================
+  Load Messages (GET)
+  ============================
+*/
 async function loadMessages() {
-  const res = await fetch(`/messages/${patientUsername}`);
-  const messages = await res.json();
+  try {
+    const res = await fetch(`/messages/${patientUsername}`);
+    if (!res.ok) throw new Error("Failed to load messages");
 
-  container.innerHTML = "";
+    const messages = await res.json();
+    container.innerHTML = "";
 
-  messages.forEach(msg => {
-    const div = document.createElement("div");
-    div.className = "message";
-    div.tabIndex = 0;
+    messages.forEach(msg => {
+      const div = document.createElement("div");
+      div.className = "message";
+      div.tabIndex = 0;
 
-    div.innerHTML = `
-      <div class="message-header">From: ${msg.sender}</div>
-      <div class="timestamp">${new Date(msg.created_at).toLocaleString()}</div>
-      <div class="message-body">${msg.body}</div>
-    `;
+      div.innerHTML = `
+        <div class="message-header">From: ${msg.sender}</div>
+        <div class="timestamp">
+          ${new Date(msg.created_at).toLocaleString()}
+        </div>
+        <div class="message-body">${msg.body}</div>
+      `;
 
-    div.onclick = () => {
-      document.querySelectorAll(".message")
-        .forEach(m => m.classList.remove("selected"));
-      div.classList.add("selected");
-    };
+      div.onclick = () => {
+        document
+          .querySelectorAll(".message")
+          .forEach(m => m.classList.remove("selected"));
+        div.classList.add("selected");
+      };
 
-    container.appendChild(div);
-  });
+      container.appendChild(div);
+    });
+  } catch (err) {
+    console.error(err);
+  }
 }
 
-/* Modal logic */
-const modal = document.getElementById("messageModal");
-const composeBar = document.getElementById("composeBar");
-
-composeBar.onclick = () => modal.style.display = "flex";
-document.getElementById("cancelModal").onclick = closeModal;
-
-/* Send message */
-document.getElementById("sendModal").onclick = async () => {
-  const recipient = document.getElementById("modalTo").value;
-  const body = document.getElementById("modalMessage").value;
-
-  const formData = new URLSearchParams();
-  formData.append("patient", patientUsername);
-  String: sender = ctx.sessionAttribute("username"); // or logged-in user
-  formData.append("recipient", recipient);
-  formData.append("body", body);
-
-  await fetch("/messages", {
-    method: "POST",
-    body: formData
-  });
-
-  closeModal();
-  loadMessages();
-};
-
-function closeModal() {
-  modal.style.display = "none";
-  document.getElementById("modalTo").value = "";
-  document.getElementById("modalMessage").value = "";
-}
-
-loadMessages();
 </script>
 
 </body>
