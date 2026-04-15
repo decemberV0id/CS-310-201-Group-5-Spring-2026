@@ -13,7 +13,8 @@ public class HospitalServer {
 
         System.out.println("Server is running!");
         System.out.println("Go to: http://localhost:7070/login.html");
-
+// it claims that using 'ctx ->' actually results in html-escaped lambdas
+// (-&gt;) rather than carets (>). apparently required to compile
         app.post("/login", ctx -> {
 
             String username = ctx.formParam("username");
@@ -61,9 +62,10 @@ public class HospitalServer {
         });
 
         app.post("/calendar", ctx -> {
-
-            String username = currentUser;
-
+        // Get the current logged-in username from the session, rather than relying
+        // on the static. If that was load-bearing, I didn't remove it entirely.
+            String username = ctx.sessionAttribute("username");
+            //String username = currentUser;
             if (username == null || username.trim().isEmpty()) {
                 System.out.println("ERROR: No currentUser set!");
                 ctx.status(401).result("{\"error\": \"No user logged in\"}");
@@ -109,7 +111,7 @@ public class HospitalServer {
             }
 
             json.append("}");
-
+            ctx.contentType("application/json") //ensures the client treats it as JSON
             ctx.result(json.toString());   // Send raw JSON string instead of ctx.json()
         });
 
@@ -119,7 +121,10 @@ public class HospitalServer {
             String username = ctx.formParam("username");
             String hashedPw = ctx.formParam("password");
             String email = ctx.formParam("email");
-            int age = Integer.parseInt(ctx.formParam("age"));
+            //null protection for age, since it's an int and may throw if left blank
+            String ageParam = ctx.formParam("age");
+            int age = ageParam != null ? Integer.parseInt(ageParam) : 0;
+
             String ssn = ctx.formParam("ssn");
             //String url = "jdbc:sqlite:hospital.db";
 
@@ -146,6 +151,8 @@ public class HospitalServer {
                     conn.rollback();
                     throw ex;
                 }
+                //added because it hangs otherwise
+                ctx.result("Registration successful");
             }
         });
 
