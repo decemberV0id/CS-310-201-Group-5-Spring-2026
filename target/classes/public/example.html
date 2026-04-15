@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API Response</title>
+</head>
+<body>
+  <h1>Response from API:</h1>
+  <div id="response"></div>
+
+  <script>
+    fetch("/example", {
+      method: "POST"
+    })
+    .then(response => response.text())
+    .then(data => {
+      document.getElementById("response").innerHTML = data;
+    })
+    .catch(error => {
+      document.getElementById("response").innerHTML = "<p>Error: " + error + "</p>";
+    });
+  </script>
+</body>
+</html>   
