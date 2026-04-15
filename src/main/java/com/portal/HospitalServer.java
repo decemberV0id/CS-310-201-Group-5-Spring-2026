@@ -2,6 +2,10 @@ package com.portal;
 
 import io.javalin.Javalin;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class HospitalServer {
     public static String currentUser = "johnm";
