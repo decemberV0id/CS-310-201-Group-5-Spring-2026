@@ -4,7 +4,7 @@ import io.javalin.Javalin;
 import java.sql.*;
 
 public class HospitalServer {
-
+    public static String currentUser = "johnm";
     public static void main(String[] args) {
 
         Javalin app = Javalin.create(config -> {
@@ -30,7 +30,7 @@ public class HospitalServer {
 
                 // Prepare SQL statement to get the password for the given username
                 PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT password FROM Account WHERE user_name = ?"
+                    "SELECT password, role FROM Account WHERE user_name = ?"
                 );
                 stmt.setString(1, username);
 
@@ -43,7 +43,11 @@ public class HospitalServer {
 
                     // Compare the provided password with the one from the database
                     if (realPassword.equals(password)) {
-                        ctx.result("<h1>Welcome, " + username + "!</h1><p>You are logged in!</p>");
+                        ctx.sessionAttribute("username", username);
+                        ctx.sessionAttribute("role", rs.getString("role"));
+                        currentUser = username;
+                        ctx.result("<h1>Welcome, " + username + "!</h1>");
+                        System.out.println("User " + username + " logged in with role " + rs.getString("role"));
                     } else {// Wrong password
                         ctx.result("<h2>Wrong password</h2>");
                     }
@@ -55,6 +59,128 @@ public class HospitalServer {
                 ctx.result("<h2>Database problem :(</h2>");
             }
         });
+
+        app.post("/calendar", ctx -> {
+
+            String username = currentUser;
+
+            if (username == null || username.trim().isEmpty()) {
+                System.out.println("ERROR: No currentUser set!");
+                ctx.status(401).result("{\"error\": \"No user logged in\"}");
+                return;
+            }
+
+            StringBuilder json = new StringBuilder("{");
+            boolean first = true;
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
+
+                // ==================== GET ROLE ====================
+                String role = null;
+                try (PreparedStatement roleStmt = conn.prepareStatement(
+                        "SELECT role FROM Account WHERE user_name = ?")) {
+
+                    roleStmt.setString(1, username);
+                    try (ResultSet rs = roleStmt.executeQuery()) {
+                        if (rs.next()) {
+                            role = rs.getString("role");
+                        }
+                    }
+                }
+
+                if (role == null) {
+                    ctx.status(404).result("{\"error\": \"User not found\"}");
+                    return;
+                }
+
+                String sql;
+
+                // ==================== DOCTOR VIEW ====================
+                if ("doctor".equalsIgnoreCase(role)) {
+
+                    sql = "SELECT a.event_date, a.event_time, a.description, " +
+                        "p.first_name, p.last_name " +
+                        "FROM Appointment a " +
+                        "JOIN PatientAccount p ON a.patient_account_id = p.patient_account_id " +
+                        "WHERE a.doctor_user_name = ? " +
+                        "ORDER BY a.event_date, a.event_time";
+
+                    try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                        pstmt.setString(1, username);
+
+                        try (ResultSet rs = pstmt.executeQuery()) {
+                            while (rs.next()) {
+
+                                String dateKey = rs.getString("event_date");
+                                String time = rs.getString("event_time") != null ? rs.getString("event_time") : "";
+                                String patientName = rs.getString("first_name") + " " + rs.getString("last_name");
+                                String desc = rs.getString("description") != null ? rs.getString("description") : "Appointment";
+
+                                // 🔥 doctor sees PATIENT name
+                                String eventText = time + " – " + patientName + "<br>" + desc;
+
+                                if (!first) json.append(",");
+                                json.append("\"")
+                                    .append(dateKey)
+                                    .append("\":\"")
+                                    .append(eventText.replace("\"", "\\\""))
+                                    .append("\"");
+
+                                first = false;
+                            }
+                        }
+                    }
+
+                } else {
+                    // ==================== PATIENT VIEW ====================
+
+                    sql = "SELECT a.event_date, a.event_time, a.description, a.doctorname " +
+                        "FROM Appointment a " +
+                        "JOIN PatientAccount p ON a.patient_account_id = p.patient_account_id " +
+                        "WHERE p.user_name = ? " +
+                        "ORDER BY a.event_date, a.event_time";
+
+                    try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                        pstmt.setString(1, username);
+
+                        try (ResultSet rs = pstmt.executeQuery()) {
+                            while (rs.next()) {
+
+                                String dateKey = rs.getString("event_date");
+                                String time = rs.getString("event_time") != null ? rs.getString("event_time") : "";
+                                String doctor = rs.getString("doctorname") != null ? rs.getString("doctorname") : "Dr. Smith";
+                                String desc = rs.getString("description") != null ? rs.getString("description") : "Appointment";
+
+                                String eventText = time + " – " + doctor + "<br>" + desc;
+
+                                if (!first) json.append(",");
+                                json.append("\"")
+                                    .append(dateKey)
+                                    .append("\":\"")
+                                    .append(eventText.replace("\"", "\\\""))
+                                    .append("\"");
+
+                                first = false;
+                            }
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                System.out.println("Database error: " + e.getMessage());
+                e.printStackTrace();
+                ctx.status(500).result("{\"error\": \"Database error\"}");
+                return;
+            }
+
+            json.append("}");
+
+            ctx.result(json.toString());   // Send raw JSON string instead of ctx.json()
+        });
+
+
+
         app.post("/register", ctx -> {
             String username = ctx.formParam("username");
             String hashedPw = ctx.formParam("password");
@@ -122,6 +248,61 @@ public class HospitalServer {
                 ctx.result("<h2>Database problem: " + ex.getMessage() + "</h2>");
             }
         });
+        app.post("/messages", ctx -> {
+            String sender = ctx.sessionAttribute("username");
+            String role = ctx.sessionAttribute("role");
+
+            if (sender == null || role == null) {
+                ctx.status(401).result("Not logged in");
+                return;
+            }
+
+            String recipient = ctx.formParam("recipient");
+            String body = ctx.formParam("body");
+
+            if (recipient == null || body == null || body.isBlank()) {
+                ctx.status(400).result("Invalid message data");
+                return;
+            }
+
+            // Patients cannot message other patients
+            if (role.equalsIgnoreCase("patient")) {
+                try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+                    PreparedStatement roleCheck = conn.prepareStatement(
+                        "SELECT role FROM Account WHERE user_name = ?"
+                    )) {
+
+                    roleCheck.setString(1, recipient);
+                    ResultSet rs = roleCheck.executeQuery();
+
+                    if (rs.next() && rs.getString("role").equalsIgnoreCase("patient")) {
+                        ctx.status(403).result("Patients cannot message other patients");
+                        return;
+                    }
+                }
+            }
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+                PreparedStatement stmt = conn.prepareStatement(
+                    """
+                    INSERT INTO Messages
+                    (sender_user_name, receiver_user_name, message_text)
+                    VALUES (?, ?, ?)
+                    """
+                )) {
+
+                stmt.setString(1, sender);
+                stmt.setString(2, recipient);
+                stmt.setString(3, body);
+                stmt.executeUpdate();
+
+                ctx.result("Message sent");
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+                ctx.status(500).result("Database error");
+            }
+        });
     }
 
     private static boolean updatePatientAccount(String username, String password, String email, Integer age, String ssn) throws SQLException {
@@ -167,5 +348,16 @@ public class HospitalServer {
             // don't hide what happened; caller can decide to show error
             throw ex;
         }
+    }
+    private static boolean hasRole(io.javalin.http.Context ctx, String... allowedRoles) {
+        String role = ctx.sessionAttribute("role");
+        if (role == null) return false;
+
+        for (String allowed : allowedRoles) {
+            if (role.equalsIgnoreCase(allowed)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
