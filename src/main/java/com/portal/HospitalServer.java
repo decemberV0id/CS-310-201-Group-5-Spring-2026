@@ -236,6 +236,7 @@ public class HospitalServer {
         });
         
         app.post("/example", ctx -> {
+             String username = currentUser;
             // Connect to database
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
                 //database query stuff
