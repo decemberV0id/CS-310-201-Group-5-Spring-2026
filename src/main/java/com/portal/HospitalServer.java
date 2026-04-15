@@ -181,59 +181,119 @@ public class HospitalServer {
         
         app.post("/messages", ctx -> {
             String sender = ctx.sessionAttribute("username");
-            String role = ctx.sessionAttribute("role");
-
+            String role   = ctx.sessionAttribute("role");
+        
             if (sender == null || role == null) {
                 ctx.status(401).result("Not logged in");
                 return;
             }
-
+        
             String recipient = ctx.formParam("recipient");
-            String body = ctx.formParam("body");
-
-            if (recipient == null || body == null || body.isBlank()) {
+            String body      = ctx.formParam("body");
+        
+            if (recipient == null || body == null ||
+                recipient.isBlank() || body.isBlank()) {
                 ctx.status(400).result("Invalid message data");
                 return;
             }
-
-            // Patients cannot message other patients
-            if (role.equalsIgnoreCase("patient")) {
-                try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-                    PreparedStatement roleCheck = conn.prepareStatement(
-                        "SELECT role FROM Account WHERE user_name = ?"
-                    )) {
-
+        
+            recipient = recipient.trim();
+            body = body.trim();
+        
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
+        
+                /* ============================
+                   Validate recipient + role
+                   ============================ */
+                String recipientRole;
+        
+                try (PreparedStatement roleCheck = conn.prepareStatement(
+                    "SELECT role FROM Account WHERE user_name = ?"
+                )) {
                     roleCheck.setString(1, recipient);
                     ResultSet rs = roleCheck.executeQuery();
-
-                    if (rs.next() && rs.getString("role").equalsIgnoreCase("patient")) {
-                        ctx.status(403).result("Patients cannot message other patients");
+        
+                    if (!rs.next()) {
+                        ctx.status(404).result("Recipient not found");
                         return;
                     }
+        
+                    recipientRole = rs.getString("role");
                 }
-            }
-
-            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-                PreparedStatement stmt = conn.prepareStatement(
+        
+                /* ============================
+                   Role enforcement
+                   ============================ */
+                if (role.equalsIgnoreCase("patient") &&
+                    recipientRole.equalsIgnoreCase("patient")) {
+                    ctx.status(403).result("Patients cannot message other patients");
+                    return;
+                }
+        
+                /* ============================
+                   Insert message
+                   patient == sender
+                   ============================ */
+                try (PreparedStatement stmt = conn.prepareStatement(
                     """
                     INSERT INTO Messages
-                    (sender_user_name, receiver_user_name, message_text)
+                      (sender_user_name, receiver_user_name, message_text)
                     VALUES (?, ?, ?)
                     """
                 )) {
-
-                stmt.setString(1, sender);
-                stmt.setString(2, recipient);
-                stmt.setString(3, body);
-                stmt.executeUpdate();
-
-                ctx.result("Message sent");
-
+                    stmt.setString(1, sender);     // patient identity
+                    stmt.setString(2, recipient);
+                    stmt.setString(3, body);
+                    stmt.executeUpdate();
+                }
+        
+                ctx.status(200).result("Message sent");
+        
             } catch (SQLException e) {
                 e.printStackTrace();
                 ctx.status(500).result("Database error");
             }
         });
+        app.get("/messages/:patient", ctx -> {
+    String patient = ctx.pathParam("patient");
+
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
+         PreparedStatement stmt = conn.prepareStatement(
+            """
+            SELECT sender_user_name AS sender,
+                   receiver_user_name AS recipient,
+                   message_text,
+                   created_at
+            FROM Messages
+            WHERE sender_user_name = ?
+               OR receiver_user_name = ?
+            ORDER BY created_at DESC
+            """
+         )) {
+
+        stmt.setString(1, patient);
+        stmt.setString(2, patient);
+
+        ResultSet rs = stmt.executeQuery();
+        List<Map<String, Object>> messages = new ArrayList<>();
+
+        while (rs.next()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("sender", rs.getString("sender"));
+            m.put("recipient", rs.getString("recipient"));
+            m.put("body", rs.getString("message_text"));
+            m.put("created_at", rs.getString("created_at"));
+            messages.add(m);
+        }
+
+        ctx.json(messages);
+
+    } catch (SQLException e) {
+        e.printStackTrace();
+        ctx.status(500);
+    }
+});
+
         
         app.post("/example", ctx -> {
              String username = currentUser;
