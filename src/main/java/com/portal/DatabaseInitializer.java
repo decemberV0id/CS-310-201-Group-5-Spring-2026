@@ -84,16 +84,12 @@ public class DatabaseInitializer {
                 """);
 
                 stmt.execute("""
-                    CREATE TABLE IF NOT EXISTS Messages (
-                        message_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        sender_user_name TEXT NOT NULL,
+                    CREATE TABLE Messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        sender_user_name   TEXT NOT NULL,   -- patient or provider
                         receiver_user_name TEXT NOT NULL,
-                        message_text TEXT NOT NULL,
-                        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        is_read BOOLEAN DEFAULT 0,
-                        read_at DATETIME,
-                        FOREIGN KEY (sender_user_name) REFERENCES Account(user_name),
-                        FOREIGN KEY (receiver_user_name) REFERENCES Account(user_name)
+                        message_text       TEXT NOT NULL,
+                        created_at         DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
                 """);
 
