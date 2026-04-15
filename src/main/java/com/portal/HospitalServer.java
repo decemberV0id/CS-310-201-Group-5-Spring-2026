@@ -234,9 +234,8 @@ public class HospitalServer {
                 ctx.status(500).result("Database error");
             }
         });
-    
-    
-         app.post("/example", ctx -> {
+        
+        app.post("/example", ctx -> {
             // Connect to database
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
                 //database query stuff
