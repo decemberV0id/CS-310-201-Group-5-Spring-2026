@@ -233,13 +233,13 @@ composeBar.onclick = () => modal.style.display = "flex";
 document.getElementById("cancelModal").onclick = closeModal;
 
 /* Send message */
+
 document.getElementById("sendModal").onclick = async () => {
   const recipient = document.getElementById("modalTo").value;
   const body = document.getElementById("modalMessage").value;
 
   const formData = new URLSearchParams();
   formData.append("patient", patientUsername);
-  String: sender = ctx.sessionAttribute("username"); // or logged-in user
   formData.append("recipient", recipient);
   formData.append("body", body);
 
@@ -251,6 +251,7 @@ document.getElementById("sendModal").onclick = async () => {
   closeModal();
   loadMessages();
 };
+
 
 function closeModal() {
   modal.style.display = "none";
