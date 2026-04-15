@@ -72,33 +72,99 @@ public class HospitalServer {
 
             StringBuilder json = new StringBuilder("{");
             boolean first = true;
-            int count = 0;
 
-            String sql = "SELECT a.event_date, a.event_time, a.description, a.doctorname " +
-                         "FROM Appointment a " +
-                         "JOIN PatientAccount p ON a.patient_account_id = p.patient_account_id " +
-                         "WHERE p.user_name = ? " +
-                         "ORDER BY a.event_date, a.event_time";
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
 
-            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db");
-                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                // ==================== GET ROLE ====================
+                String role = null;
+                try (PreparedStatement roleStmt = conn.prepareStatement(
+                        "SELECT role FROM Account WHERE user_name = ?")) {
 
-                pstmt.setString(1, username);
+                    roleStmt.setString(1, username);
+                    try (ResultSet rs = roleStmt.executeQuery()) {
+                        if (rs.next()) {
+                            role = rs.getString("role");
+                        }
+                    }
+                }
 
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    while (rs.next()) {
-                        String dateKey = rs.getString("event_date");
-                        String time = rs.getString("event_time") != null ? rs.getString("event_time") : "";
-                        String doctor = rs.getString("doctorname") != null ? rs.getString("doctorname") : "Dr. Smith";
-                        String desc = rs.getString("description") != null ? rs.getString("description") : "Appointment";
+                if (role == null) {
+                    ctx.status(404).result("{\"error\": \"User not found\"}");
+                    return;
+                }
 
-                        String eventText = time + " – " + doctor + "<br>" + desc;
+                String sql;
 
-                        if (!first) json.append(",");
-                        json.append("\"").append(dateKey).append("\":\"").append(eventText.replace("\"", "\\\"")).append("\"");
+                // ==================== DOCTOR VIEW ====================
+                if ("doctor".equalsIgnoreCase(role)) {
 
-                        first = false;
-                        count++;
+                    sql = "SELECT a.event_date, a.event_time, a.description, " +
+                        "p.first_name, p.last_name " +
+                        "FROM Appointment a " +
+                        "JOIN PatientAccount p ON a.patient_account_id = p.patient_account_id " +
+                        "WHERE a.doctor_user_name = ? " +
+                        "ORDER BY a.event_date, a.event_time";
+
+                    try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                        pstmt.setString(1, username);
+
+                        try (ResultSet rs = pstmt.executeQuery()) {
+                            while (rs.next()) {
+
+                                String dateKey = rs.getString("event_date");
+                                String time = rs.getString("event_time") != null ? rs.getString("event_time") : "";
+                                String patientName = rs.getString("first_name") + " " + rs.getString("last_name");
+                                String desc = rs.getString("description") != null ? rs.getString("description") : "Appointment";
+
+                                // 🔥 doctor sees PATIENT name
+                                String eventText = time + " – " + patientName + "<br>" + desc;
+
+                                if (!first) json.append(",");
+                                json.append("\"")
+                                    .append(dateKey)
+                                    .append("\":\"")
+                                    .append(eventText.replace("\"", "\\\""))
+                                    .append("\"");
+
+                                first = false;
+                            }
+                        }
+                    }
+
+                } else {
+                    // ==================== PATIENT VIEW ====================
+
+                    sql = "SELECT a.event_date, a.event_time, a.description, a.doctorname " +
+                        "FROM Appointment a " +
+                        "JOIN PatientAccount p ON a.patient_account_id = p.patient_account_id " +
+                        "WHERE p.user_name = ? " +
+                        "ORDER BY a.event_date, a.event_time";
+
+                    try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                        pstmt.setString(1, username);
+
+                        try (ResultSet rs = pstmt.executeQuery()) {
+                            while (rs.next()) {
+
+                                String dateKey = rs.getString("event_date");
+                                String time = rs.getString("event_time") != null ? rs.getString("event_time") : "";
+                                String doctor = rs.getString("doctorname") != null ? rs.getString("doctorname") : "Dr. Smith";
+                                String desc = rs.getString("description") != null ? rs.getString("description") : "Appointment";
+
+                                String eventText = time + " – " + doctor + "<br>" + desc;
+
+                                if (!first) json.append(",");
+                                json.append("\"")
+                                    .append(dateKey)
+                                    .append("\":\"")
+                                    .append(eventText.replace("\"", "\\\""))
+                                    .append("\"");
+
+                                first = false;
+                            }
+                        }
                     }
                 }
             } catch (SQLException e) {
