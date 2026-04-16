@@ -741,6 +741,42 @@ public class HospitalServer {
             }
         });
 
+        app.post("/messages/read", ctx -> {
+            String username = currentUser;
+
+            if (username == null || username.trim().isEmpty()) {
+                ctx.status(401).contentType("application/json")
+                   .result("{\"error\":\"Not logged in\"}");
+                return;
+            }
+
+            String otherUser = ctx.formParam("otherUser");
+
+            if (otherUser == null || otherUser.trim().isEmpty()) {
+                ctx.status(400).contentType("application/json")
+                   .result("{\"error\":\"Missing otherUser parameter\"}");
+                return;
+            }
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
+                try (PreparedStatement stmt = conn.prepareStatement(
+                    "UPDATE Messages SET is_read = 1 WHERE receiver_user_name = ? AND sender_user_name = ?"
+                )) {
+                    stmt.setString(1, username);
+                    stmt.setString(2, otherUser);
+                    stmt.executeUpdate();
+                }
+
+                ctx.status(200).contentType("application/json")
+                   .result("{\"status\":\"success\"}");
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+                ctx.status(500).contentType("application/json")
+                   .result("{\"error\":\"Database error\"}");
+            }
+        });
+
         app.get("/medications", ctx -> {
             String username = currentUser;
             if (username == null || username.trim().isEmpty()) {

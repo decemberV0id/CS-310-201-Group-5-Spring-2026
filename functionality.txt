@@ -1,0 +1,35 @@
+Hospital Portal - Implemented Functionality
+
+1. User Authentication (Login): users can sign in with username and password through the login page, with credential validation against the Account table.
+
+2. Role-Based Access Behavior: the system distinguishes between patient and doctor roles and returns role-specific data and views across multiple modules.
+
+3. Doctor Secondary Verification (Demo 2FA Flow): after doctor login, the system generates a 4-digit verification code and requires code entry before dashboard access (demo inbox preview in UI).
+
+4. Session-Aware User Context: the server tracks the currently logged-in user context and uses it to load personalized records (calendar, messages, profile, medications, reports).
+
+5. Dashboard Navigation Hub: users access a centralized dashboard with module navigation for Overview, Appointments, Messages, Medications, Test Results, and Profile.
+
+6. Appointment Calendar View: users can view scheduled appointments in a calendar format.
+	- Patient view: shows doctor and appointment description.
+	- Doctor view: shows patient name and appointment description.
+
+7. Secure Messaging Retrieval: users can load conversation history involving their account (sent and received messages) in a threaded chat-style interface.
+
+8. Send Message Functionality: users can send new messages to another user, with messages stored in the database and timestamped for conversation display.
+
+9. Profile Retrieval by Role: users can view role-specific profile data.
+	- Patient profile includes demographics/contact fields (name, age, height, address, emergency contact, phone).
+	- Doctor profile includes professional/contact fields (position, specialty, address, phone).
+
+10. Profile Update (Editable Fields): users can update selected profile fields.
+	- Patients: address, emergency contact, phone number.
+	- Doctors: address, phone number.
+
+11. Lab/Test Results Access: patients can view their lab report history (test name, status/result, date, notes) from stored lab records.
+
+12. Medication Records Access:
+	- Patient view: shows the logged-in patient medication list.
+	- Doctor view: shows medications grouped by patients with appointments tied to that doctor.
+
+
