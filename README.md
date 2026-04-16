@@ -13,7 +13,13 @@ src\main\java\com\portal\HospitalServer.java
 when the program is running, open the url
 http://localhost:7070/login.html
 
-enter the patient user account
+patient accounts:
 Username: johnm
 Password: secret2026
 
+Username: janed
+Password: secret2026
+
+doctor account:
+Username: drsmith
+Password: secret2026
