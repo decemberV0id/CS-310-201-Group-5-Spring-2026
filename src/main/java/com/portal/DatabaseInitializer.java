@@ -7,7 +7,7 @@ import java.sql.*;
 
 public class DatabaseInitializer {
     public static void main(String[] args) {
-        try {
+        try {//need to delete existing db to reset data
             Files.deleteIfExists(Path.of("hospital.db"));
             System.out.println("Deleted existing hospital.db");
         } catch (IOException e) {
