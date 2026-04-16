@@ -1,9 +1,19 @@
 package com.portal;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.*;
 
 public class DatabaseInitializer {
     public static void main(String[] args) {
+        try {
+            Files.deleteIfExists(Path.of("hospital.db"));
+            System.out.println("Deleted existing hospital.db");
+        } catch (IOException e) {
+            System.err.println("Could not delete existing hospital.db: " + e.getMessage());
+        }
+
         String url = "jdbc:sqlite:hospital.db";
 
         try (Connection conn = DriverManager.getConnection(url)) {
