@@ -16,7 +16,11 @@ public class HospitalServer {
         System.out.println("Server is running!");
         System.out.println("Go to: http://localhost:7070/login.html");
 
+        // POST /login — Authenticates a user by checking username and password against the database.
+        // Sets the current user on success and returns a welcome message.
         app.post("/login", ctx -> {
+
+            // Read submitted credentials from the login form.
 
             String username = ctx.formParam("username");
             String password = ctx.formParam("password");
@@ -62,7 +66,10 @@ public class HospitalServer {
             }
         });
 
+        // POST /verify — Returns the role and email of the current user.
+        // For doctors, also generates a random 4-digit verification code.
         app.post("/verify", ctx -> {
+            // Use the active server-side user as the verification subject.
             String username = currentUser;
 
             if (username == null || username.trim().isEmpty()) {
@@ -90,6 +97,7 @@ public class HospitalServer {
                 String safeEmail = email.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
 
                 if ("doctor".equalsIgnoreCase(role)) {
+                    // Doctors receive an extra verification code and email payload.
                     int code = 1000 + new Random().nextInt(9000);
 
                     String payload = "{"
@@ -113,8 +121,11 @@ public class HospitalServer {
             }
         });
 
+        // POST /calendar — Returns appointments for the current user as a JSON map of date → event text.
+        // Doctors see patient names; patients see their doctor's name.
         app.post("/calendar", ctx -> {
 
+            // Resolve current account before loading calendar events.
             String username = currentUser;
 
             if (username == null || username.trim().isEmpty()) {
@@ -150,6 +161,8 @@ public class HospitalServer {
 
                 // ==================== DOCTOR VIEW ====================
                 if ("doctor".equalsIgnoreCase(role)) {
+
+                    // Doctor timeline includes patient names per appointment.
 
                     sql = "SELECT a.event_date, a.event_time, a.description, " +
                         "p.first_name, p.last_name " +
@@ -187,6 +200,7 @@ public class HospitalServer {
 
                 } else {
                     // ==================== PATIENT VIEW ====================
+                    // Patient timeline includes doctor name per appointment.
 
                     sql = "SELECT a.event_date, a.event_time, a.description, a.doctorname " +
                         "FROM Appointment a " +
@@ -232,7 +246,9 @@ public class HospitalServer {
             ctx.result(json.toString());   // Send raw JSON string instead of ctx.json()
         });
         
+        // POST /messages — Returns all messages sent to or from the current user as a JSON array.
         app.post("/messages", ctx -> {
+            // Fetch conversation history for the logged-in user.
             String username = currentUser;
 
             if (username == null || username.trim().isEmpty()) {
@@ -241,67 +257,15 @@ public class HospitalServer {
             }
 
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
-                try (Statement schemaStmt = conn.createStatement()) {
-                    schemaStmt.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS Messages (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            sender_user_name TEXT NOT NULL,
-                            receiver_user_name TEXT NOT NULL,
-                            message_text TEXT NOT NULL,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            is_read INTEGER DEFAULT 0
-                        )
-                        """
-                    );
-                }
-
-                boolean hasCreatedAt = false;
-                boolean hasIsRead = false;
-                try (PreparedStatement colStmt = conn.prepareStatement("PRAGMA table_info(Messages)");
-                     ResultSet colRs = colStmt.executeQuery()) {
-                    while (colRs.next()) {
-                        String colName = colRs.getString("name");
-                        if ("created_at".equalsIgnoreCase(colName)) {
-                            hasCreatedAt = true;
-                        }
-                        if ("is_read".equalsIgnoreCase(colName)) {
-                            hasIsRead = true;
-                        }
-                    }
-                }
-
-                String selectSql;
-                if (hasCreatedAt && hasIsRead) {
-                    selectSql =
-                        "SELECT sender_user_name AS sender, " +
-                        "receiver_user_name AS recipient, " +
-                        "message_text, " +
-                        "created_at, " +
-                        "is_read " +
-                        "FROM Messages " +
-                        "WHERE sender_user_name = ? OR receiver_user_name = ? " +
-                        "ORDER BY created_at ASC";
-                } else if (hasCreatedAt) {
-                    selectSql =
-                        "SELECT sender_user_name AS sender, " +
-                        "receiver_user_name AS recipient, " +
-                        "message_text, " +
-                        "created_at, " +
-                        "0 AS is_read " +
-                        "FROM Messages " +
-                        "WHERE sender_user_name = ? OR receiver_user_name = ? " +
-                        "ORDER BY created_at ASC";
-                } else {
-                    selectSql =
-                        "SELECT sender_user_name AS sender, " +
-                        "receiver_user_name AS recipient, " +
-                        "message_text, " +
-                        "'' AS created_at, " +
-                        "0 AS is_read " +
-                        "FROM Messages " +
-                        "WHERE sender_user_name = ? OR receiver_user_name = ?";
-                }
+                String selectSql =
+                    "SELECT sender_user_name AS sender, " +
+                    "receiver_user_name AS recipient, " +
+                    "message_text, " +
+                    "created_at, " +
+                    "is_read " +
+                    "FROM Messages " +
+                    "WHERE sender_user_name = ? OR receiver_user_name = ? " +
+                    "ORDER BY created_at ASC";
 
                 PreparedStatement stmt = conn.prepareStatement(selectSql);
                 stmt.setString(1, username);
@@ -344,11 +308,14 @@ public class HospitalServer {
                                          .replace("\n", "\\n")
                                          .replace("\r", "\\r");
 
+                    int isRead = rs.getInt("is_read");
+
                     json.append("{")
                         .append("\"sender\":\"").append(sender).append("\",")
                         .append("\"recipient\":\"").append(recipient).append("\",")
                         .append("\"body\":\"").append(body).append("\",")
-                        .append("\"created_at\":\"").append(createdAt).append("\"")
+                        .append("\"created_at\":\"").append(createdAt).append("\",")
+                        .append("\"is_read\":").append(isRead)
                         .append("}");
 
                     first = false;
@@ -380,7 +347,10 @@ public class HospitalServer {
             }
         });
 
+        // GET /overview — Returns a dashboard summary for the current user:
+        // display name, unread message count, active medication count, and upcoming appointments.
         app.get("/overview", ctx -> {
+            // Build personalized overview cards and upcoming visit previews.
             String username = currentUser;
 
 
@@ -442,6 +412,7 @@ public class HospitalServer {
 
                 int activeMedsCount = 0;
                 if ("doctor".equalsIgnoreCase(role)) {
+                    // Count medications for patients assigned to this doctor.
                     try (PreparedStatement medsStmt = conn.prepareStatement(
                         "SELECT COUNT(DISTINCT m.medication_id) AS meds_count " +
                         "FROM Medication m " +
@@ -456,6 +427,7 @@ public class HospitalServer {
                         }
                     }
                 } else {
+                    // Count medications for the currently logged-in patient.
                     try (PreparedStatement medsStmt = conn.prepareStatement(
                         "SELECT COUNT(*) AS meds_count " +
                         "FROM Medication m " +
@@ -473,6 +445,7 @@ public class HospitalServer {
 
                 int upcomingCount = 0;
                 if ("doctor".equalsIgnoreCase(role)) {
+                    // Doctors get their future appointments directly by doctor username.
                     try (PreparedStatement countStmt = conn.prepareStatement(
                         "SELECT COUNT(*) AS appointment_count " +
                         "FROM Appointment " +
@@ -486,6 +459,7 @@ public class HospitalServer {
                         }
                     }
                 } else {
+                    // Patients get future appointments through their patient account mapping.
                     try (PreparedStatement countStmt = conn.prepareStatement(
                         "SELECT COUNT(*) AS appointment_count " +
                         "FROM Appointment a " +
@@ -627,7 +601,11 @@ public class HospitalServer {
             }
         });
         
+        // GET /profile — Returns profile details for the current user.
+        // Patients get personal info (name, age, height, address, emergency contact).
+        // Doctors get professional info (position, specialty, address).
         app.get("/profile", ctx -> {
+            // Determine current user role, then project role-specific profile fields.
             String username = currentUser;
 
             if (username == null || username.trim().isEmpty()) {
@@ -657,6 +635,7 @@ public class HospitalServer {
                 }
 
                 if ("patient".equalsIgnoreCase(role)) {
+                    // Return patient demographics and emergency contact details.
                     String sql = "SELECT first_name, last_name, age, height, address, emergency_contact " +
                         "FROM PatientAccount WHERE user_name = ?";
 
@@ -706,6 +685,7 @@ public class HospitalServer {
                         }
                     }
                 } else if ("doctor".equalsIgnoreCase(role)) {
+                    // Return doctor-facing professional profile fields.
                     String sql = "SELECT position, specialty, address FROM StaffAccount WHERE user_name = ?";
 
                     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -755,7 +735,11 @@ public class HospitalServer {
             }
         });
 
+        // POST /updateprofile — Updates a single editable field on the current user's profile.
+        // Patients can edit: address, emergencyContact, phoneNumber.
+        // Doctors can edit: address, phoneNumber.
         app.post("/updateprofile", ctx -> {
+            // Apply a single-field profile update based on role-specific rules.
             String username = currentUser;
 
             if (username == null || username.trim().isEmpty()) {
@@ -796,6 +780,7 @@ public class HospitalServer {
 
                 int updated = 0;
                 if ("patient".equalsIgnoreCase(role)) {
+                    // Patient edit whitelist.
                     if ("address".equals(field)) {
                         try (PreparedStatement stmt = conn.prepareStatement(
                                 "UPDATE PatientAccount SET address = ? WHERE user_name = ?")) {
@@ -823,6 +808,7 @@ public class HospitalServer {
                         return;
                     }
                 } else if ("doctor".equalsIgnoreCase(role)) {
+                    // Doctor edit whitelist.
                     if ("address".equals(field)) {
                         try (PreparedStatement stmt = conn.prepareStatement(
                                 "UPDATE StaffAccount SET address = ? WHERE user_name = ?")) {
@@ -858,7 +844,9 @@ public class HospitalServer {
             }
         });
 
+        // GET /reports — Returns all lab test results for the current patient, ordered by date.
         app.get("/reports", ctx -> {
+            // Resolve the patient account and stream lab results as JSON.
             String user = currentUser;
 
             if (user == null || user.trim().isEmpty()) {
@@ -938,7 +926,10 @@ public class HospitalServer {
             }
         });
 
+        // POST /messages/send — Saves a new message from the current user to a specified recipient.
+        // Returns the saved message as JSON.
         app.post("/messages/send", ctx -> {
+            // Validate sender/recipient and persist a new message row.
             String sender = currentUser;
             if (sender == null || sender.trim().isEmpty()) {
                 sender = currentUser;
@@ -988,7 +979,9 @@ public class HospitalServer {
             }
         });
 
+        // POST /messages/read — Marks all messages from a given sender as read for the current user.
         app.post("/messages/read", ctx -> {
+            // Mark inbound messages from a specific conversation partner as read.
             String username = currentUser;
 
             if (username == null || username.trim().isEmpty()) {
@@ -1024,7 +1017,10 @@ public class HospitalServer {
             }
         });
 
+        // GET /medications — Returns medication data for the current user.
+        // Doctors see all medications for their patients; patients see only their own.
         app.get("/medications", ctx -> {
+            // Branch response shape by role (doctor roster vs patient list).
             String username = currentUser;
             if (username == null || username.trim().isEmpty()) {
                 ctx.status(401).contentType("application/json")
@@ -1051,6 +1047,7 @@ public class HospitalServer {
                 }
 
                 if ("doctor".equalsIgnoreCase(role)) {
+                    // Build grouped patient -> medications payload for the doctor's panel.
                     String sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
                         "m.medicine_name, m.frequency, m.date_prescribed, m.notes " +
                         "FROM (SELECT DISTINCT patient_account_id FROM Appointment WHERE doctor_user_name = ?) ap " +
@@ -1141,6 +1138,7 @@ public class HospitalServer {
                         }
                     }
                 } else {
+                    // Build a single patient medication list for self view.
                     String sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
                         "m.medicine_name, m.frequency, m.date_prescribed, m.notes " +
                         "FROM PatientAccount pa " +
@@ -1229,8 +1227,10 @@ public class HospitalServer {
             }
         });
 
+        // POST /example — Template/placeholder endpoint for testing new database queries.
         app.post("/example", ctx -> {
-             String username = currentUser;
+            // Placeholder handler keeps DB connection scaffold for future experiments.
+            String username = currentUser;
             // Connect to database
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
                 //database query stuff
