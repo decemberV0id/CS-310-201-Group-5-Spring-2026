@@ -28,24 +28,15 @@ const fallbackOverviewData = {
 };
 
 async function fetchOverviewData() {
-  const routesToTry = [
-    "/api/overview",
-    `/api/overview?username=${username}`
-  ];
+  try {
+    const response = await fetch("/overview");
 
-  for (const route of routesToTry) {
-    try {
-      const response = await fetch(route);
-
-      if (!response.ok) {
-        continue;
-      }
-
+    if (response.ok) {
       const data = await response.json();
       return normalizeOverviewData(data);
-    } catch (error) {
-      console.error(`Failed route: ${route}`, error);
     }
+  } catch (error) {
+    console.error("Failed route: /overview", error);
   }
 
   return fallbackOverviewData;

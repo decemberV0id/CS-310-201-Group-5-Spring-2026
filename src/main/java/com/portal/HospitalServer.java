@@ -379,6 +379,253 @@ public class HospitalServer {
                    .result("{\"currentUser\":\"\",\"messages\":[]}");
             }
         });
+
+        app.get("/overview", ctx -> {
+            String username = currentUser;
+
+
+            if (username == null || username.trim().isEmpty()) {
+                ctx.status(401).contentType("application/json")
+                   .result("{\"error\":\"No user logged in\"}");
+                return;
+            }
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
+                String role = null;
+                try (PreparedStatement roleStmt = conn.prepareStatement(
+                    "SELECT role FROM Account WHERE user_name = ?"
+                )) {
+                    roleStmt.setString(1, username);
+                    try (ResultSet roleRs = roleStmt.executeQuery()) {
+                        if (roleRs.next()) {
+                            role = roleRs.getString("role");
+                        }
+                    }
+                }
+
+                if (role == null) {
+                    ctx.status(404).contentType("application/json")
+                       .result("{\"error\":\"User not found\"}");
+                    return;
+                }
+
+                String displayName = username;
+                if ("patient".equalsIgnoreCase(role)) {
+                    try (PreparedStatement nameStmt = conn.prepareStatement(
+                        "SELECT first_name, last_name FROM PatientAccount WHERE user_name = ?"
+                    )) {
+                        nameStmt.setString(1, username);
+                        try (ResultSet nameRs = nameStmt.executeQuery()) {
+                            if (nameRs.next()) {
+                                String firstName = nameRs.getString("first_name") == null ? "" : nameRs.getString("first_name");
+                                String lastName = nameRs.getString("last_name") == null ? "" : nameRs.getString("last_name");
+                                String fullName = (firstName + " " + lastName).trim();
+                                if (!fullName.isEmpty()) {
+                                    displayName = fullName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                int unreadCount = 0;
+                try (PreparedStatement unreadStmt = conn.prepareStatement(
+                    "SELECT COUNT(*) AS unread_count FROM Messages WHERE receiver_user_name = ? AND is_read = 0"
+                )) {
+                    unreadStmt.setString(1, username);
+                    try (ResultSet unreadRs = unreadStmt.executeQuery()) {
+                        if (unreadRs.next()) {
+                            unreadCount = unreadRs.getInt("unread_count");
+                        }
+                    }
+                }
+
+                int activeMedsCount = 0;
+                if ("doctor".equalsIgnoreCase(role)) {
+                    try (PreparedStatement medsStmt = conn.prepareStatement(
+                        "SELECT COUNT(DISTINCT m.medication_id) AS meds_count " +
+                        "FROM Medication m " +
+                        "JOIN Appointment a ON a.patient_account_id = m.patient_account_id " +
+                        "WHERE a.doctor_user_name = ?"
+                    )) {
+                        medsStmt.setString(1, username);
+                        try (ResultSet medsRs = medsStmt.executeQuery()) {
+                            if (medsRs.next()) {
+                                activeMedsCount = medsRs.getInt("meds_count");
+                            }
+                        }
+                    }
+                } else {
+                    try (PreparedStatement medsStmt = conn.prepareStatement(
+                        "SELECT COUNT(*) AS meds_count " +
+                        "FROM Medication m " +
+                        "JOIN PatientAccount p ON p.patient_account_id = m.patient_account_id " +
+                        "WHERE p.user_name = ?"
+                    )) {
+                        medsStmt.setString(1, username);
+                        try (ResultSet medsRs = medsStmt.executeQuery()) {
+                            if (medsRs.next()) {
+                                activeMedsCount = medsRs.getInt("meds_count");
+                            }
+                        }
+                    }
+                }
+
+                int upcomingCount = 0;
+                if ("doctor".equalsIgnoreCase(role)) {
+                    try (PreparedStatement countStmt = conn.prepareStatement(
+                        "SELECT COUNT(*) AS appointment_count " +
+                        "FROM Appointment " +
+                        "WHERE doctor_user_name = ? AND date(event_date) >= date('now')"
+                    )) {
+                        countStmt.setString(1, username);
+                        try (ResultSet countRs = countStmt.executeQuery()) {
+                            if (countRs.next()) {
+                                upcomingCount = countRs.getInt("appointment_count");
+                            }
+                        }
+                    }
+                } else {
+                    try (PreparedStatement countStmt = conn.prepareStatement(
+                        "SELECT COUNT(*) AS appointment_count " +
+                        "FROM Appointment a " +
+                        "JOIN PatientAccount p ON p.patient_account_id = a.patient_account_id " +
+                        "WHERE p.user_name = ? AND date(a.event_date) >= date('now')"
+                    )) {
+                        countStmt.setString(1, username);
+                        try (ResultSet countRs = countStmt.executeQuery()) {
+                            if (countRs.next()) {
+                                upcomingCount = countRs.getInt("appointment_count");
+                            }
+                        }
+                    }
+                }
+
+                StringBuilder appointmentsJson = new StringBuilder("[");
+                boolean firstAppointment = true;
+
+                if ("doctor".equalsIgnoreCase(role)) {
+                    try (PreparedStatement apptStmt = conn.prepareStatement(
+                        "SELECT a.event_date, a.event_time, a.type, a.description, p.first_name, p.last_name " +
+                        "FROM Appointment a " +
+                        "JOIN PatientAccount p ON p.patient_account_id = a.patient_account_id " +
+                        "WHERE a.doctor_user_name = ? AND date(a.event_date) >= date('now') " +
+                        "ORDER BY a.event_date, a.event_time LIMIT 5"
+                    )) {
+                        apptStmt.setString(1, username);
+
+                        try (ResultSet apptRs = apptStmt.executeQuery()) {
+                            while (apptRs.next()) {
+                                String date = apptRs.getString("event_date") == null ? "" : apptRs.getString("event_date");
+                                String time = apptRs.getString("event_time") == null ? "" : apptRs.getString("event_time");
+                                String specialty = apptRs.getString("type") == null ? "" : apptRs.getString("type");
+                                String firstName = apptRs.getString("first_name") == null ? "" : apptRs.getString("first_name");
+                                String lastName = apptRs.getString("last_name") == null ? "" : apptRs.getString("last_name");
+                                String doctor = (firstName + " " + lastName).trim();
+                                if (doctor.isEmpty()) {
+                                    doctor = "Patient";
+                                }
+
+                                String action = "Review";
+                                String description = apptRs.getString("description");
+                                if (description != null && description.toLowerCase().contains("video")) {
+                                    action = "Video Visit";
+                                }
+
+                                date = date.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                time = time.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                specialty = specialty.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                doctor = doctor.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                action = action.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+
+                                if (!firstAppointment) {
+                                    appointmentsJson.append(",");
+                                }
+
+                                appointmentsJson.append("{")
+                                    .append("\"doctor\":\"").append(doctor).append("\",")
+                                    .append("\"specialty\":\"").append(specialty).append("\",")
+                                    .append("\"date\":\"").append(date).append("\",")
+                                    .append("\"time\":\"").append(time).append("\",")
+                                    .append("\"action\":\"").append(action).append("\"")
+                                    .append("}");
+
+                                firstAppointment = false;
+                            }
+                        }
+                    }
+                } else {
+                    try (PreparedStatement apptStmt = conn.prepareStatement(
+                        "SELECT a.event_date, a.event_time, a.type, a.description, a.doctorname, a.doctor_user_name " +
+                        "FROM Appointment a " +
+                        "JOIN PatientAccount p ON p.patient_account_id = a.patient_account_id " +
+                        "WHERE p.user_name = ? AND date(a.event_date) >= date('now') " +
+                        "ORDER BY a.event_date, a.event_time LIMIT 5"
+                    )) {
+                        apptStmt.setString(1, username);
+
+                        try (ResultSet apptRs = apptStmt.executeQuery()) {
+                            while (apptRs.next()) {
+                                String date = apptRs.getString("event_date") == null ? "" : apptRs.getString("event_date");
+                                String time = apptRs.getString("event_time") == null ? "" : apptRs.getString("event_time");
+                                String specialty = apptRs.getString("type") == null ? "" : apptRs.getString("type");
+                                String doctor = apptRs.getString("doctorname");
+                                if (doctor == null || doctor.trim().isEmpty()) {
+                                    doctor = apptRs.getString("doctor_user_name");
+                                }
+                                if (doctor == null || doctor.trim().isEmpty()) {
+                                    doctor = "Doctor";
+                                }
+
+                                String action = "Review";
+                                String description = apptRs.getString("description");
+                                if (description != null && description.toLowerCase().contains("video")) {
+                                    action = "Video Visit";
+                                }
+
+                                date = date.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                time = time.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                specialty = specialty.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                doctor = doctor.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                action = action.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+
+                                if (!firstAppointment) {
+                                    appointmentsJson.append(",");
+                                }
+
+                                appointmentsJson.append("{")
+                                    .append("\"doctor\":\"").append(doctor).append("\",")
+                                    .append("\"specialty\":\"").append(specialty).append("\",")
+                                    .append("\"date\":\"").append(date).append("\",")
+                                    .append("\"time\":\"").append(time).append("\",")
+                                    .append("\"action\":\"").append(action).append("\"")
+                                    .append("}");
+
+                                firstAppointment = false;
+                            }
+                        }
+                    }
+                }
+
+                appointmentsJson.append("]");
+
+                displayName = displayName.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+
+                String payload = "{" +
+                    "\"userName\":\"" + displayName + "\"," +
+                    "\"upcomingCount\":" + upcomingCount + "," +
+                    "\"unreadCount\":" + unreadCount + "," +
+                    "\"activeMedsCount\":" + activeMedsCount + "," +
+                    "\"appointments\":" + appointmentsJson +
+                    "}";
+
+                ctx.contentType("application/json").result(payload);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                ctx.status(500).contentType("application/json")
+                   .result("{\"error\":\"Database error\"}");
+            }
+        });
         
         app.get("/profile", ctx -> {
             String username = currentUser;
@@ -981,10 +1228,6 @@ public class HospitalServer {
                    .result("{\"error\":\"Database problem\"}");
             }
         });
-
-
-
-
 
         app.post("/example", ctx -> {
              String username = currentUser;
