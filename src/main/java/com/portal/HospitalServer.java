@@ -292,17 +292,11 @@ public class HospitalServer {
                                          .replace("\n", "\\n")
                                          .replace("\r", "\\r");
 
-                    int isRead = rs.getInt("is_read");
-                    if (rs.wasNull()) {
-                        isRead = 0;
-                    }
-
                     json.append("{")
                         .append("\"sender\":\"").append(sender).append("\",")
                         .append("\"recipient\":\"").append(recipient).append("\",")
                         .append("\"body\":\"").append(body).append("\",")
-                        .append("\"created_at\":\"").append(createdAt).append("\",")
-                        .append("\"is_read\":").append(isRead)
+                        .append("\"created_at\":\"").append(createdAt).append("\"")
                         .append("}");
 
                     first = false;
@@ -331,76 +325,6 @@ public class HospitalServer {
                 e.printStackTrace();
                 ctx.status(500).contentType("application/json")
                    .result("{\"currentUser\":\"\",\"messages\":[]}");
-            }
-        });
-
-        app.post("/messages/read", ctx -> {
-            String username = currentUser;
-
-            if (username == null || username.trim().isEmpty()) {
-                ctx.status(401).contentType("application/json")
-                   .result("{\"error\":\"No current user set\"}");
-                return;
-            }
-
-            String otherUser = ctx.formParam("otherUser");
-            if (otherUser == null || otherUser.trim().isEmpty()) {
-                ctx.status(400).contentType("application/json")
-                   .result("{\"error\":\"Missing conversation user\"}");
-                return;
-            }
-
-            otherUser = otherUser.trim();
-
-            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
-                try (Statement schemaStmt = conn.createStatement()) {
-                    schemaStmt.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS Messages (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            sender_user_name TEXT NOT NULL,
-                            receiver_user_name TEXT NOT NULL,
-                            message_text TEXT NOT NULL,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            is_read INTEGER DEFAULT 0
-                        )
-                        """
-                    );
-                }
-
-                boolean hasIsRead = false;
-                try (PreparedStatement colStmt = conn.prepareStatement("PRAGMA table_info(Messages)");
-                     ResultSet colRs = colStmt.executeQuery()) {
-                    while (colRs.next()) {
-                        String colName = colRs.getString("name");
-                        if ("is_read".equalsIgnoreCase(colName)) {
-                            hasIsRead = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!hasIsRead) {
-                    try (Statement alterStmt = conn.createStatement()) {
-                        alterStmt.execute("ALTER TABLE Messages ADD COLUMN is_read INTEGER DEFAULT 0");
-                    }
-                }
-
-                int updated = 0;
-                try (PreparedStatement updateStmt = conn.prepareStatement(
-                    "UPDATE Messages SET is_read = 1 WHERE sender_user_name = ? AND receiver_user_name = ? AND is_read = 0"
-                )) {
-                    updateStmt.setString(1, otherUser);
-                    updateStmt.setString(2, username);
-                    updated = updateStmt.executeUpdate();
-                }
-
-                ctx.contentType("application/json")
-                   .result("{\"updated\":" + updated + "}");
-            } catch (SQLException e) {
-                e.printStackTrace();
-                ctx.status(500).contentType("application/json")
-                   .result("{\"error\":\"Database error\"}");
             }
         });
         
@@ -458,14 +382,14 @@ public class HospitalServer {
                             String address = rs.getString("address") == null ? "" : rs.getString("address");
                             String emergencyContact = rs.getString("emergency_contact") == null ? "" : rs.getString("emergency_contact");
 
-                            username = username.replace("\\", "\\\\").replace("\"", "\\\"");
-                            name = name.replace("\\", "\\\\").replace("\"", "\\\"");
-                            role = role.replace("\\", "\\\\").replace("\"", "\\\"");
-                            age = age.replace("\\", "\\\\").replace("\"", "\\\"");
-                            height = height.replace("\\", "\\\\").replace("\"", "\\\"");
-                            phoneNumber = phoneNumber.replace("\\", "\\\\").replace("\"", "\\\"");
-                            address = address.replace("\\", "\\\\").replace("\"", "\\\"");
-                            emergencyContact = emergencyContact.replace("\\", "\\\\").replace("\"", "\\\"");
+                            name = name.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            role = role.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            username = username.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            age = age.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            height = height.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            address = address.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            emergencyContact = emergencyContact.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            phoneNumber = phoneNumber.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
 
                             String json = "{" +
                                 "\"username\":\"" + username + "\"," +
@@ -499,13 +423,13 @@ public class HospitalServer {
                             String specialty = rs.getString("specialty") == null ? "" : rs.getString("specialty");
                             String address = rs.getString("address") == null ? "" : rs.getString("address");
 
-                            name = name.replace("\\", "\\\\").replace("\"", "\\\"");
-                            role = role.replace("\\", "\\\\").replace("\"", "\\\"");
-                            username = username.replace("\\", "\\\\").replace("\"", "\\\"");
-                            position = position.replace("\\", "\\\\").replace("\"", "\\\"");
-                            specialty = specialty.replace("\\", "\\\\").replace("\"", "\\\"");
-                            address = address.replace("\\", "\\\\").replace("\"", "\\\"");
-                            phoneNumber = phoneNumber.replace("\\", "\\\\").replace("\"", "\\\"");
+                            name = name.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            role = role.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            username = username.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            position = position.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            specialty = specialty.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            address = address.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            phoneNumber = phoneNumber.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
 
                             String json = "{" +
                                 "\"username\":\"" + username + "\"," +
@@ -645,71 +569,34 @@ public class HospitalServer {
             }
 
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
-                String role = null;
-                try (PreparedStatement roleStmt = conn.prepareStatement(
-                        "SELECT role FROM Account WHERE user_name = ?")) {
-                    roleStmt.setString(1, user);
-                    try (ResultSet roleRs = roleStmt.executeQuery()) {
-                        if (roleRs.next()) {
-                            role = roleRs.getString("role");
-                        }
-                    }
-                }
-
-                if (role == null) {
-                    ctx.status(404).contentType("application/json")
-                        .result("{\"error\":\"User not found\"}");
-                    return;
-                }
-
-                String sql;
-                if ("doctor".equalsIgnoreCase(role)) {
-                    sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
-                        "ltr.test_name, ltr.lab_results, ltr.test_date, ltr.notes " +
-                        "FROM LabTestResult ltr " +
-                        "JOIN PatientAccount pa ON pa.patient_account_id = ltr.patient_account_id " +
-                        "WHERE ltr.ordered_by = ? " +
-                        "ORDER BY ltr.test_date DESC";
-                } else {
-                    sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
-                        "ltr.test_name, ltr.lab_results, ltr.test_date, ltr.notes " +
-                        "FROM PatientAccount pa " +
-                        "JOIN LabTestResult ltr ON pa.patient_account_id = ltr.patient_account_id " +
-                        "WHERE pa.user_name = ? " +
-                        "ORDER BY ltr.test_date DESC";
-                }
+                String sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
+                    "ltr.test_name, ltr.lab_results, ltr.test_date, ltr.notes " +
+                    "FROM PatientAccount pa " +
+                    "JOIN LabTestResult ltr ON pa.patient_account_id = ltr.patient_account_id " +
+                    "WHERE pa.user_name = ? " +
+                    "ORDER BY ltr.test_date DESC";
 
                 try (PreparedStatement getReports = conn.prepareStatement(sql)) {
                     getReports.setString(1, user);
 
                     try (ResultSet rs = getReports.executeQuery()) {
                         StringBuilder json = new StringBuilder();
-
-                        String patientId = "";
-                        String patientName = "";
-
-                        json.append("{\"patient\":{\"id\":\"")
-                            .append(patientId)
-                            .append("\",\"name\":\"")
-                            .append(patientName.replace("\\", "\\\\").replace("\"", "\\\""))
-                            .append("\"},\"results\":[");
+                        json.append("{\"patient\":{\"id\":\"\",\"name\":\"\"},\"results\":[");
 
                         boolean first = true;
+                        String patientId = "";
+                        String patientName = "";
 
                         while (rs.next()) {
                             if (!first) json.append(",");
                             first = false;
 
-                            if (patientId.isEmpty() && !"doctor".equalsIgnoreCase(role)) {
+                            if (patientId.isEmpty()) {
                                 patientId = String.valueOf(rs.getInt("patient_account_id"));
                                 String firstName = rs.getString("first_name") == null ? "" : rs.getString("first_name");
                                 String lastName = rs.getString("last_name") == null ? "" : rs.getString("last_name");
                                 patientName = (firstName + " " + lastName).trim();
                             }
-
-                            String firstName = rs.getString("first_name") == null ? "" : rs.getString("first_name");
-                            String lastName = rs.getString("last_name") == null ? "" : rs.getString("last_name");
-                            String rowPatient = (firstName + " " + lastName).trim();
 
                             String testName = rs.getString("test_name") == null ? "" : rs.getString("test_name");
                             String status = rs.getString("lab_results") == null ? "" : rs.getString("lab_results");
@@ -720,27 +607,28 @@ public class HospitalServer {
                             status = status.replace("\\", "\\\\").replace("\"", "\\\"");
                             date = date.replace("\\", "\\\\").replace("\"", "\\\"");
                             notes = notes.replace("\\", "\\\\").replace("\"", "\\\"");
-                            rowPatient = rowPatient.replace("\\", "\\\\").replace("\"", "\\\"");
 
                             json.append(String.format(
-                                "{\"test_name\":\"%s\",\"status\":\"%s\",\"date\":\"%s\",\"notes\":\"%s\",\"patient_name\":\"%s\"}",
-                                testName, status, date, notes, rowPatient
+                                "{\"test_name\":\"%s\",\"status\":\"%s\",\"date\":\"%s\",\"notes\":\"%s\"}",
+                                testName, status, date, notes
                             ));
                         }
 
-                        if (!"doctor".equalsIgnoreCase(role)) {
-                            String safePatientId = patientId.replace("\\", "\\\\").replace("\"", "\\\"");
-                            String safePatientName = patientName.replace("\\", "\\\\").replace("\"", "\\\"");
-                            String patientPrefix = "{\"patient\":{\"id\":\"\",\"name\":\"\"}";
-                            String safePrefix = "{\"patient\":{\"id\":\"" + safePatientId + "\",\"name\":\"" + safePatientName + "\"}";
-                            int patientStart = json.indexOf(patientPrefix);
-                            if (patientStart >= 0) {
-                                json.replace(patientStart, patientStart + patientPrefix.length(), safePrefix);
-                            }
+                        String safePatientId = patientId.replace("\\", "\\\\").replace("\"", "\\\"");
+                        String safePatientName = patientName.replace("\\", "\\\\").replace("\"", "\\\"");
+
+                        String payload = json.toString();
+                        int patientStart = payload.indexOf("{\"patient\":{\"id\":\"\",\"name\":\"\"}");
+                        if (patientStart >= 0) {
+                            payload = payload.replace(
+                                "{\"patient\":{\"id\":\"\",\"name\":\"\"}",
+                                "{\"patient\":{\"id\":\"" + safePatientId + "\",\"name\":\"" + safePatientName + "\"}"
+                            );
                         }
 
-                        json.append("]}");
-                        ctx.contentType("application/json").result(json.toString());
+                        payload = payload + "]}";
+
+                        ctx.contentType("application/json").result(payload);
                     }
                 }
             } catch (SQLException e) {
@@ -750,7 +638,6 @@ public class HospitalServer {
                    .result("{\"error\":\"Database error\"}");
             }
         });
-
 
         app.post("/messages/send", ctx -> {
             String sender = currentUser;
@@ -802,6 +689,215 @@ public class HospitalServer {
             }
         });
 
+        app.get("/medications", ctx -> {
+            String username = currentUser;
+            if (username == null || username.trim().isEmpty()) {
+                ctx.status(401).contentType("application/json")
+                   .result("{\"error\":\"No user logged in\"}");
+                return;
+            }
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
+                String role = null;
+                try (PreparedStatement roleStmt = conn.prepareStatement(
+                        "SELECT role FROM Account WHERE user_name = ?")) {
+                    roleStmt.setString(1, username);
+                    try (ResultSet roleRs = roleStmt.executeQuery()) {
+                        if (roleRs.next()) {
+                            role = roleRs.getString("role");
+                        }
+                    }
+                }
+
+                if (role == null) {
+                    ctx.status(404).contentType("application/json")
+                       .result("{\"error\":\"User not found\"}");
+                    return;
+                }
+
+                if ("doctor".equalsIgnoreCase(role)) {
+                    String sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
+                        "m.medicine_name, m.frequency, m.date_prescribed, m.notes " +
+                        "FROM (SELECT DISTINCT patient_account_id FROM Appointment WHERE doctor_user_name = ?) ap " +
+                        "JOIN PatientAccount pa ON pa.patient_account_id = ap.patient_account_id " +
+                        "LEFT JOIN Medication m ON m.patient_account_id = pa.patient_account_id " +
+                        "ORDER BY pa.last_name, pa.first_name, m.date_prescribed DESC, m.medicine_name";
+
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, username);
+
+                        try (ResultSet rs = stmt.executeQuery()) {
+                            StringBuilder json = new StringBuilder();
+                            String safeUsername = username.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            json.append("{\"role\":\"doctor\",\"doctor\":{\"username\":\"")
+                                .append(safeUsername)
+                                .append("\"},\"patients\":[");
+
+                            boolean firstPatient = true;
+                            int currentPatientId = -1;
+                            boolean firstMedicationForPatient = true;
+
+                            while (rs.next()) {
+                                int patientId = rs.getInt("patient_account_id");
+                                String firstName = rs.getString("first_name") == null ? "" : rs.getString("first_name");
+                                String lastName = rs.getString("last_name") == null ? "" : rs.getString("last_name");
+                                String fullName = (firstName + " " + lastName).trim();
+                                if (fullName.isEmpty()) {
+                                    fullName = "Patient " + patientId;
+                                }
+                                String safePatientId = String.valueOf(patientId).replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                String safeFullName = fullName.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+
+                                if (patientId != currentPatientId) {
+                                    if (currentPatientId != -1) {
+                                        json.append("]}");
+                                    }
+
+                                    if (!firstPatient) {
+                                        json.append(",");
+                                    }
+
+                                    json.append("{\"id\":\"")
+                                        .append(safePatientId)
+                                        .append("\",\"name\":\"")
+                                        .append(safeFullName)
+                                        .append("\",\"medications\":[");
+
+                                    firstPatient = false;
+                                    currentPatientId = patientId;
+                                    firstMedicationForPatient = true;
+                                }
+
+                                String medicineName = rs.getString("medicine_name");
+                                if (medicineName != null) {
+                                    String frequency = rs.getString("frequency") == null ? "" : rs.getString("frequency");
+                                    String datePrescribed = rs.getString("date_prescribed") == null ? "" : rs.getString("date_prescribed");
+                                    String notes = rs.getString("notes") == null ? "" : rs.getString("notes");
+                                    String safeMedicineName = medicineName.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                    String safeFrequency = frequency.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                    String safeDatePrescribed = datePrescribed.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                    String safeNotes = notes.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+
+                                    if (!firstMedicationForPatient) {
+                                        json.append(",");
+                                    }
+
+                                    json.append("{\"medicine_name\":\"")
+                                        .append(safeMedicineName)
+                                        .append("\",\"frequency\":\"")
+                                        .append(safeFrequency)
+                                        .append("\",\"date_prescribed\":\"")
+                                        .append(safeDatePrescribed)
+                                        .append("\",\"notes\":\"")
+                                        .append(safeNotes)
+                                        .append("\"}");
+
+                                    firstMedicationForPatient = false;
+                                }
+                            }
+
+                            if (currentPatientId != -1) {
+                                json.append("]}");
+                            }
+
+                            json.append("]}");
+
+                            ctx.contentType("application/json").result(json.toString());
+                        }
+                    }
+                } else {
+                    String sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
+                        "m.medicine_name, m.frequency, m.date_prescribed, m.notes " +
+                        "FROM PatientAccount pa " +
+                        "LEFT JOIN Medication m ON pa.patient_account_id = m.patient_account_id " +
+                        "WHERE pa.user_name = ? " +
+                        "ORDER BY m.date_prescribed DESC, m.medicine_name";
+
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, username);
+
+                        try (ResultSet rs = stmt.executeQuery()) {
+                            StringBuilder json = new StringBuilder();
+                            json.append("{\"role\":\"patient\",\"patient\":{\"id\":\"\",\"name\":\"\"},\"medications\":[");
+
+                            boolean firstMedication = true;
+                            boolean foundPatient = false;
+                            String patientId = "";
+                            String patientName = "";
+
+                            while (rs.next()) {
+                                if (!foundPatient) {
+                                    foundPatient = true;
+                                    patientId = String.valueOf(rs.getInt("patient_account_id"));
+
+                                    String firstName = rs.getString("first_name") == null ? "" : rs.getString("first_name");
+                                    String lastName = rs.getString("last_name") == null ? "" : rs.getString("last_name");
+                                    patientName = (firstName + " " + lastName).trim();
+                                    if (patientName.isEmpty()) {
+                                        patientName = username;
+                                    }
+                                }
+
+                                String medicineName = rs.getString("medicine_name");
+                                if (medicineName == null) {
+                                    continue;
+                                }
+
+                                String frequency = rs.getString("frequency") == null ? "" : rs.getString("frequency");
+                                String datePrescribed = rs.getString("date_prescribed") == null ? "" : rs.getString("date_prescribed");
+                                String notes = rs.getString("notes") == null ? "" : rs.getString("notes");
+                                String safeMedicineName = medicineName.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                String safeFrequency = frequency.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                String safeDatePrescribed = datePrescribed.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                                String safeNotes = notes.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+
+                                if (!firstMedication) {
+                                    json.append(",");
+                                }
+
+                                json.append("{\"medicine_name\":\"")
+                                    .append(safeMedicineName)
+                                    .append("\",\"frequency\":\"")
+                                    .append(safeFrequency)
+                                    .append("\",\"date_prescribed\":\"")
+                                    .append(safeDatePrescribed)
+                                    .append("\",\"notes\":\"")
+                                    .append(safeNotes)
+                                    .append("\"}");
+
+                                firstMedication = false;
+                            }
+
+                            if (!foundPatient) {
+                                ctx.status(404).contentType("application/json")
+                                   .result("{\"error\":\"Patient profile not found\"}");
+                                return;
+                            }
+
+                            String payload = json.toString();
+                            String safePatientId = patientId.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            String safePatientName = patientName.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                            payload = payload.replace(
+                                "{\"role\":\"patient\",\"patient\":{\"id\":\"\",\"name\":\"\"}",
+                                "{\"role\":\"patient\",\"patient\":{\"id\":\"" + safePatientId + "\",\"name\":\"" + safePatientName + "\"}"
+                            );
+
+                            payload = payload + "]}";
+                            ctx.contentType("application/json").result(payload);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.status(500).contentType("application/json")
+                   .result("{\"error\":\"Database problem\"}");
+            }
+        });
+
+
+
+
+
         app.post("/example", ctx -> {
              String username = currentUser;
             // Connect to database
@@ -821,5 +917,8 @@ public class HospitalServer {
         });
 
     
+
+
+
     }
 }
