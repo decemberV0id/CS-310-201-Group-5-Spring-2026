@@ -18,7 +18,7 @@ const recordsData = {
 
   balance: "Satisfactory",
 
-  prescriptions: [Atorvostatin, Metformin],
+  prescriptions: ["Atorvastatin", "Metformin"],
 
   tests: "See Profile",
 
@@ -32,23 +32,23 @@ const recordsData = {
 
 function renderRecords(){
 
-    document.getElementById("chart").textContent = 'Chart No: ${recordsData.chartNo}';
+  document.getElementById("chart").textContent = `Chart No: ${recordsData.chartNo}`;
 
-    document.getElementById("pID").textContent = "Patient ID: ${recordsData.patientNo}";
+  document.getElementById("pID").textContent = `Patient ID: ${recordsData.patientNo}`;
 
-    document.getElementById("bp").textContent = "Blood Pressure: ${recordsData.bloodPressure}";
+  document.getElementById("bp").textContent = `Blood Pressure: ${recordsData.bloodPressure}`;
 
-    document.getElementById("wt").textContent = "Weight: ${recordsData.weight}";
+  document.getElementById("wt").textContent = `Weight: ${recordsData.weight}`;
 
-    document.getElementById("temp").textContent = "Temperature(F): ${recordsData.temp}";
+  document.getElementById("temp").textContent = `Temperature(F): ${recordsData.temp}`;
 
-    document.getElementById("balance").textContent = "Balance: ${recordsData.balance}";
+  document.getElementById("balance").textContent = `Balance: ${recordsData.balance}`;
 
-    document.getElementById("rx").textContent = "Prescriptions: ${recordsData.prescriptions}";
+  document.getElementById("rx").textContent = `Prescriptions: ${recordsData.prescriptions.join(", ")}`;
 
-    document.getElementById("results").textContent = "Test Results: ${recordsData.tests}";
+  document.getElementById("results").textContent = `Test Results: ${recordsData.tests}`;
 
-    document.getElementById("notes").textContent = "Notes: ${recordsData.notes}";
+  document.getElementById("notes").textContent = `Notes: ${recordsData.notes}`;
 
 }
 
