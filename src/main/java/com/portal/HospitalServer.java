@@ -846,7 +846,7 @@ public class HospitalServer {
 
         // GET /reports — Returns all lab test results for the current patient, ordered by date.
         app.get("/reports", ctx -> {
-            // Resolve the patient account and stream lab results as JSON.
+            // Resolve the user role and stream lab results as JSON.
             String user = currentUser;
 
             if (user == null || user.trim().isEmpty()) {
@@ -855,18 +855,47 @@ public class HospitalServer {
                 return;
             }
 
+            // Connect to the database for role lookup and report queries.
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
-                String sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
-                    "ltr.test_name, ltr.lab_results, ltr.test_date, ltr.notes " +
-                    "FROM PatientAccount pa " +
-                    "JOIN LabTestResult ltr ON pa.patient_account_id = ltr.patient_account_id " +
-                    "WHERE pa.user_name = ? " +
-                    "ORDER BY ltr.test_date DESC";
+                String role = null;
 
+                // Get the current user's role.
+                try (PreparedStatement roleStmt = conn.prepareStatement(
+                        "SELECT role FROM Account WHERE user_name = ?")) {
+                    roleStmt.setString(1, user);
+                    try (ResultSet roleRs = roleStmt.executeQuery()) {
+                        if (roleRs.next()) {
+                            role = roleRs.getString("role");
+                        }
+                    }
+                }
+
+                // Doctors see tests they ordered; patients see their own tests.
+                boolean doctorView = "doctor".equalsIgnoreCase(role);
+                String sql;
+
+                if (doctorView) {
+                    sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
+                        "ltr.test_name, ltr.lab_results, ltr.test_date, ltr.notes " +
+                        "FROM LabTestResult ltr " +
+                        "JOIN PatientAccount pa ON pa.patient_account_id = ltr.patient_account_id " +
+                        "WHERE ltr.ordered_by = ? " +
+                        "ORDER BY ltr.test_date DESC";
+                } else {
+                    sql = "SELECT pa.patient_account_id, pa.first_name, pa.last_name, " +
+                        "ltr.test_name, ltr.lab_results, ltr.test_date, ltr.notes " +
+                        "FROM PatientAccount pa " +
+                        "JOIN LabTestResult ltr ON pa.patient_account_id = ltr.patient_account_id " +
+                        "WHERE pa.user_name = ? " +
+                        "ORDER BY ltr.test_date DESC";
+                }
+
+                // Run the query for this user and build the JSON response.
                 try (PreparedStatement getReports = conn.prepareStatement(sql)) {
                     getReports.setString(1, user);
 
                     try (ResultSet rs = getReports.executeQuery()) {
+                        // Start with an empty patient object and append results rows below.
                         StringBuilder json = new StringBuilder();
                         json.append("{\"patient\":{\"id\":\"\",\"name\":\"\"},\"results\":[");
 
@@ -874,15 +903,19 @@ public class HospitalServer {
                         String patientId = "";
                         String patientName = "";
 
+                        // Convert each DB row into one JSON result object.
                         while (rs.next()) {
                             if (!first) json.append(",");
                             first = false;
 
-                            if (patientId.isEmpty()) {
+                            String rowPatientName = "";
+                            String firstName = rs.getString("first_name") == null ? "" : rs.getString("first_name");
+                            String lastName = rs.getString("last_name") == null ? "" : rs.getString("last_name");
+                            rowPatientName = (firstName + " " + lastName).trim();
+
+                            if (!doctorView && patientId.isEmpty()) {
                                 patientId = String.valueOf(rs.getInt("patient_account_id"));
-                                String firstName = rs.getString("first_name") == null ? "" : rs.getString("first_name");
-                                String lastName = rs.getString("last_name") == null ? "" : rs.getString("last_name");
-                                patientName = (firstName + " " + lastName).trim();
+                                patientName = rowPatientName;
                             }
 
                             String testName = rs.getString("test_name") == null ? "" : rs.getString("test_name");
@@ -890,35 +923,50 @@ public class HospitalServer {
                             String date = rs.getString("test_date") == null ? "" : rs.getString("test_date");
                             String notes = rs.getString("notes") == null ? "" : rs.getString("notes");
 
+                            // Escape values since this endpoint builds JSON manually.
                             testName = testName.replace("\\", "\\\\").replace("\"", "\\\"");
                             status = status.replace("\\", "\\\\").replace("\"", "\\\"");
                             date = date.replace("\\", "\\\\").replace("\"", "\\\"");
                             notes = notes.replace("\\", "\\\\").replace("\"", "\\\"");
+                            rowPatientName = rowPatientName.replace("\\", "\\\\").replace("\"", "\\\"");
 
-                            json.append(String.format(
-                                "{\"test_name\":\"%s\",\"status\":\"%s\",\"date\":\"%s\",\"notes\":\"%s\"}",
-                                testName, status, date, notes
-                            ));
+                            json.append("{\"test_name\":\"")
+                                .append(testName)
+                                .append("\",\"status\":\"")
+                                .append(status)
+                                .append("\",\"date\":\"")
+                                .append(date)
+                                .append("\",\"notes\":\"")
+                                .append(notes)
+                                .append("\"");
+
+                            if (doctorView) {
+                                json.append(",\"patient_name\":\"")
+                                    .append(rowPatientName)
+                                    .append("\"");
+                            }
+
+                            json.append("}");
                         }
 
+                        // Fill top-level patient info for patient view.
                         String safePatientId = patientId.replace("\\", "\\\\").replace("\"", "\\\"");
                         String safePatientName = patientName.replace("\\", "\\\\").replace("\"", "\\\"");
 
                         String payload = json.toString();
-                        int patientStart = payload.indexOf("{\"patient\":{\"id\":\"\",\"name\":\"\"}");
-                        if (patientStart >= 0) {
-                            payload = payload.replace(
-                                "{\"patient\":{\"id\":\"\",\"name\":\"\"}",
-                                "{\"patient\":{\"id\":\"" + safePatientId + "\",\"name\":\"" + safePatientName + "\"}"
-                            );
-                        }
+                        payload = payload.replace(
+                            "{\"patient\":{\"id\":\"\",\"name\":\"\"}",
+                            "{\"patient\":{\"id\":\"" + safePatientId + "\",\"name\":\"" + safePatientName + "\"}"
+                        );
 
+                        // Close and send the response payload.
                         payload = payload + "]}";
 
                         ctx.contentType("application/json").result(payload);
                     }
                 }
             } catch (SQLException e) {
+                // Return a generic error when database operations fail.
                 System.out.println("Database error: " + e.getMessage());
                 e.printStackTrace();
                 ctx.status(500).contentType("application/json")
