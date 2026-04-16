@@ -42,6 +42,35 @@
     tbody tr:hover {
       background-color: #d4edda;
     }
+
+    tr.report-row.expanded {
+      background-color: #cdecd6;
+    }
+
+    tr.detail-row td {
+      background-color: #f7fbf8;
+      text-align: left;
+      padding: 14px 16px;
+      border-top: none;
+    }
+
+    .detail-box {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      row-gap: 8px;
+      column-gap: 10px;
+      font-size: 0.95rem;
+    }
+
+    .detail-label {
+      font-weight: bold;
+      color: #2f4f3a;
+    }
+
+    .detail-value {
+      color: #333;
+      word-break: break-word;
+    }
  
     #status-message {
       margin-top: 20px;
@@ -108,54 +137,108 @@
  
   <p id="status-message">Loading lab results...</p>
  
-  <!-- Modal for test details -->
-  <div id="details-modal">
-    <div id="modal-content">
-      <h3>Test Details</h3>
-      <p><strong>Test Name:</strong> <span id="modal-name"></span></p>
-      <p><strong>Status:</strong> <span id="modal-status"></span></p>
-      <p><strong>Date:</strong> <span id="modal-date"></span></p>
-      <p><strong>Notes:</strong> <span id="modal-notes"></span></p>
-      <button onclick="closeModal()">Close</button>
-    </div>
-  </div>
-
   <script>
-    // TODO: Replace URL with API endpoint when backend is ready.
-    // Expected: GET /api/lab-results?patientId=1
-    const PATIENT_ID = 1; // TODO: Replace with dynamic patient ID (e.g. from URL params)
-    const API_URL = `/api/lab-results?patientId=${PATIENT_ID}`;
+    // Fetch lab reports for the current logged-in user.
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function createDetailRow(parentRow) {
+      const details = JSON.parse(parentRow.dataset.details);
+      const detailRow = document.createElement("tr");
+      detailRow.className = "detail-row";
+      detailRow.dataset.parentId = parentRow.dataset.rowId;
+      const isDoctorView = details.patient_name && details.patient_name.trim() !== "";
+
+      const detailCell = document.createElement("td");
+      detailCell.colSpan = isDoctorView ? 4 : 3;
+      const patientBlock = isDoctorView
+        ? `
+          <div class="detail-label">Patient</div>
+          <div class="detail-value">${escapeHtml(details.patient_name)}</div>
+        `
+        : "";
+
+      detailCell.innerHTML = `
+        <div class="detail-box">
+          ${patientBlock}
+          <div class="detail-label">Test Name</div>
+          <div class="detail-value">${escapeHtml(details.test_name || "N/A")}</div>
+          <div class="detail-label">Status</div>
+          <div class="detail-value">${escapeHtml(details.status || "N/A")}</div>
+          <div class="detail-label">Date</div>
+          <div class="detail-value">${escapeHtml(details.date || "N/A")}</div>
+          <div class="detail-label">Notes</div>
+          <div class="detail-value">${escapeHtml(details.notes || "No notes available")}</div>
+        </div>
+      `;
+
+      detailRow.appendChild(detailCell);
+      return detailRow;
+    }
  
     async function loadLabResults() {
       try {
-        const response = await fetch(API_URL);
+        const response = await fetch("/reports");
  
         if (!response.ok) {
           throw new Error(`Server returned ${response.status}`);
         }
  
         const data = await response.json();
+        const patient = data.patient || { name: "", id: "" };
+        const results = Array.isArray(data.results) ? data.results : [];
+        const isDoctorView = !patient.id && results.some(row => (row.patient_name || "").trim() !== "");
+
+        const headerRow = document.querySelector("table thead tr");
+        let patientHeader = document.getElementById("patient-column-header");
+        if (isDoctorView && !patientHeader) {
+          patientHeader = document.createElement("th");
+          patientHeader.id = "patient-column-header";
+          patientHeader.textContent = "Patient";
+          headerRow.appendChild(patientHeader);
+        }
+        if (!isDoctorView && patientHeader) {
+          patientHeader.remove();
+        }
         
         // Display patient info
-        document.getElementById("patient-info").textContent =
-          `Patient: ${data.patient.name} (ID: ${data.patient.id})`;
+        document.getElementById("patient-info").textContent = isDoctorView
+          ? ""
+          : (patient.name || patient.id
+              ? `Patient: ${patient.name || "Unknown"}`
+              : "Patient information unavailable");
  
         // Populate table rows
         const tbody = document.getElementById("lab-results-body");
         tbody.innerHTML = ""; // Clear any existing rows
  
-        data.results.forEach(row => {
+        results.forEach((row, index) => {
           const tr = document.createElement("tr");
+          tr.className = "report-row";
+          tr.dataset.rowId = String(index);
           tr.dataset.details = JSON.stringify(row); // Store row data for modal
+          const patientCell = isDoctorView
+            ? `<td>${escapeHtml(row.patient_name || "Unknown")}</td>`
+            : "";
           tr.innerHTML = `
-            <td>${row.test_name}</td>
-            <td>${row.status}</td>
-            <td>${row.date}</td>
+            <td>${escapeHtml(row.test_name || "")}</td>
+            <td>${escapeHtml(row.status || "")}</td>
+            <td>${escapeHtml(row.date || "")}</td>
+            ${patientCell}
           `;
           tbody.appendChild(tr);
         });
- 
-        document.getElementById("status-message").textContent = "";
+
+        document.getElementById("status-message").textContent = results.length
+          ? ""
+          : "No lab reports found.";
  
       } catch (error) {
         // If the backend isn't available yet, provide three fallback demo reports
@@ -168,12 +251,14 @@
         ];
 
         document.getElementById("patient-info").textContent =
-          `Patient: ${demoPatient.name} (ID: ${demoPatient.id})`;
+          `Patient: ${demoPatient.name}`;
 
         const tbody = document.getElementById("lab-results-body");
         tbody.innerHTML = "";
-        fallbackResults.forEach(row => {
+        fallbackResults.forEach((row, index) => {
           const tr = document.createElement("tr");
+          tr.className = "report-row";
+          tr.dataset.rowId = `fallback-${index}`;
           tr.dataset.details = JSON.stringify(row);
           tr.innerHTML = `
             <td>${row.test_name}</td>
@@ -189,52 +274,26 @@
     }
     
     // Single event listener for tbody via event delegation.
-    // When a row is clicked, open the modal using the stored dataset.details
+    // Clicking a row toggles an inline detail row directly under it.
     document.getElementById("lab-results-body").addEventListener("click", function(event) {
-      const tr = event.target.closest("tr");
-      if (tr && tr.dataset && tr.dataset.details) {
-        try {
-          showDetails(tr);
-        } catch (e) {
-          console.error('Failed to show details for row', e);
-        }
+      const tr = event.target.closest("tr.report-row");
+      if (!tr || !tr.dataset || !tr.dataset.details) return;
+
+      const tbody = this;
+      const openDetailRows = tbody.querySelectorAll("tr.detail-row");
+      openDetailRows.forEach(row => row.remove());
+
+      const wasExpanded = tr.classList.contains("expanded");
+      tbody.querySelectorAll("tr.report-row.expanded").forEach(row => row.classList.remove("expanded"));
+
+      if (!wasExpanded) {
+        const detailRow = createDetailRow(tr);
+        tr.insertAdjacentElement("afterend", detailRow);
+        tr.classList.add("expanded");
       }
     });
 
-
-    function showDetails(row) {
-      const details = JSON.parse(row.dataset.details);
-      document.getElementById("modal-name").textContent = details.test_name
-      document.getElementById("modal-status").textContent = details.status
-      document.getElementById("modal-date").textContent = details.date;
-      document.getElementById("modal-notes").textContent = details.notes || "";
-      document.getElementById("details-modal").classList.add("open");
-    }
-
-    function closeModal() {
-      document.getElementById("details-modal").classList.remove("open");
-    }
-
-    // Close modal when clicking outside the content box
-    document.getElementById("details-modal").addEventListener("click", function(e) {
-      if (e.target === this) closeModal();
-    });
-
-    window.onload = function() {
-      fetch("/reports")
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Failed to load results.html: ${response.status}`);
-          }
-          return response.text();
-      })
-      .then(html => {
-        console.log("Successfully loaded results.html");
-      })
-      .catch(error => {
-        console.error("Error loading results.html:", error);
-      });}
-    loadLabResults();
+    window.onload = loadLabResults;
   </script>
  
 </body>

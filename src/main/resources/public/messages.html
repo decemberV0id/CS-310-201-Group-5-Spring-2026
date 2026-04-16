@@ -170,8 +170,37 @@
       padding: 12px 18px;
       border-top: 1px solid var(--line);
       background: var(--panel);
-      color: var(--muted);
-      font-size: 13px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    #messageInput {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    #sendBtn {
+      padding: 10px 16px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    #sendBtn:hover {
+      opacity: 0.9;
+    }
+
+    #sendBtn:active {
+      opacity: 0.8;
     }
 
     .empty {
@@ -213,7 +242,10 @@
       <div class="chat-messages" id="chatMessages">
         <div class="empty">Pick a conversation on the left to view messages.</div>
       </div>
-      <div class="chat-footer">Send-message controls will be added in a later step.</div>
+      <div class="chat-footer">
+        <input type="text" id="messageInput" placeholder="Type your message..." />
+        <button id="sendBtn">Send</button>
+      </div>
     </section>
   </main>
 
@@ -222,6 +254,8 @@
     const chatHeader = document.getElementById("chatHeader");
     const chatMessages = document.getElementById("chatMessages");
     const currentUserLabel = document.getElementById("currentUserLabel");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
 
     let currentUser = "";
     let conversations = [];
@@ -235,6 +269,10 @@
       const dt = new Date(value);
       if (Number.isNaN(dt.getTime())) return safeText(value);
       return dt.toLocaleString();
+    }
+
+    function isMessageRead(message) {
+      return Number(message?.is_read) === 1 || message?.is_read === true;
     }
 
     function groupConversations(messages) {
@@ -257,12 +295,18 @@
       map.forEach((items, otherUser) => {
         items.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         const latest = items[items.length - 1];
+        const unreadCount = items.filter(item => {
+          return safeText(item.sender) === otherUser
+            && safeText(item.recipient) === currentUser
+            && !isMessageRead(item);
+        }).length;
 
         groups.push({
           otherUser,
           items,
           latest,
-          latestTs: latest ? new Date(latest.created_at).getTime() || 0 : 0
+          latestTs: latest ? new Date(latest.created_at).getTime() || 0 : 0,
+          unreadCount
         });
       });
 
@@ -284,16 +328,15 @@
         btn.className = "conversation-item" + (selectedConversation === convo.otherUser ? " active" : "");
 
         const latestBody = convo.latest ? safeText(convo.latest.body) : "";
+        const unreadLabel = convo.unreadCount > 0 ? ` • ${convo.unreadCount} unread` : "";
 
         btn.innerHTML = `
-          <div class="conversation-title">${convo.otherUser}</div>
+          <div class="conversation-title">${convo.otherUser}${unreadLabel}</div>
           <div class="conversation-preview">${latestBody}</div>
         `;
 
-        btn.addEventListener("click", () => {
-          selectedConversation = convo.otherUser;
-          renderConversationList();
-          renderChat();
+        btn.addEventListener("click", async () => {
+          await openConversation(convo.otherUser);
         });
 
         conversationList.appendChild(btn);
@@ -330,7 +373,8 @@
 
         const meta = document.createElement("div");
         meta.className = "bubble-meta";
-        meta.textContent = (mine ? "You" : safeText(msg.sender)) + " • " + formatTime(msg.created_at);
+        const readStatus = isMessageRead(msg) ? "Read" : "Not read";
+        meta.textContent = (mine ? "You" : safeText(msg.sender)) + " • " + formatTime(msg.created_at) + " • " + readStatus;
 
         wrap.appendChild(bubble);
         wrap.appendChild(meta);
@@ -339,6 +383,101 @@
 
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
+
+    async function markConversationAsRead(otherUser) {
+      const formData = new FormData();
+      formData.append("otherUser", otherUser);
+
+      const response = await fetch("/messages/read", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to mark messages as read");
+      }
+
+      const convo = conversations.find(c => c.otherUser === otherUser);
+      if (!convo) return;
+
+      convo.items.forEach(item => {
+        if (
+          safeText(item.sender) === otherUser
+          && safeText(item.recipient) === currentUser
+        ) {
+          item.is_read = 1;
+        }
+      });
+      convo.unreadCount = 0;
+    }
+
+    async function openConversation(otherUser) {
+      selectedConversation = otherUser;
+      try {
+        await markConversationAsRead(otherUser);
+      } catch (error) {
+        console.error(error);
+      }
+      renderConversationList();
+      renderChat();
+    }
+
+    async function sendMessage() {
+      if (!selectedConversation) {
+        alert("Select a conversation first");
+        return;
+      }
+
+      const body = messageInput.value.trim();
+      if (!body) return;
+
+      const formData = new FormData();
+      formData.append("recipient", selectedConversation);
+      formData.append("body", body);
+
+      try {
+        const response = await fetch("/messages/send", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          alert("Error: " + (errorData.error || "Failed to send"));
+          return;
+        }
+
+        const newMsg = await response.json();
+        messageInput.value = "";
+
+        const convo = conversations.find(c => c.otherUser === selectedConversation);
+        if (convo) {
+          newMsg.is_read = newMsg.is_read !== undefined ? newMsg.is_read : 0;
+          convo.items.push(newMsg);
+          convo.latest = newMsg;
+          convo.latestTs = new Date(newMsg.created_at).getTime() || 0;
+          convo.unreadCount = convo.items.filter(item => {
+            return safeText(item.sender) === convo.otherUser
+              && safeText(item.recipient) === currentUser
+              && !isMessageRead(item);
+          }).length;
+
+          renderConversationList();
+          renderChat();
+        }
+      } catch (error) {
+        console.error(error);
+        alert("Failed to send message");
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    messageInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
 
     async function loadMessages() {
       try {
@@ -369,7 +508,11 @@
         selectedConversation = conversations.length > 0 ? conversations[0].otherUser : null;
 
         renderConversationList();
-        renderChat();
+        if (selectedConversation) {
+          await openConversation(selectedConversation);
+        } else {
+          renderChat();
+        }
       } catch (error) {
         console.error(error);
         currentUserLabel.textContent = "Unable to load messages";

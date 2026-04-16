@@ -1,199 +1,273 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Patient Reports</title>
-  <link rel="stylesheet" href="styles.css"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile</title>
   <style>
-    body { font-family: Arial; text-align: center; margin-top: 100px; }
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f4f8f5;
+      color: #1f2937;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+    }
+
+    .title {
+      margin: 0 0 6px;
+      color: #166534;
+    }
+
+    .subtitle {
+      margin: 0 0 16px;
+      color: #4b5563;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #dbe7df;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      border: 1px solid #ecf2ed;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fbfdfb;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .label {
+      margin: 0 0 6px;
+      font-size: 12px;
+      color: #6b7280;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .value {
+      margin: 0;
+      font-weight: 600;
+    }
+
+    .field-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .edit-btn {
+      border: 1px solid #86c5a1;
+      background: #effaf3;
+      color: #166534;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .edit-btn:hover {
+      background: #ddf4e5;
+    }
+
+    .status {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status.show {
+      display: block;
+    }
+
+    .status.loading {
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      color: #075985;
+    }
+
+    .status.error {
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    @media (max-width: 680px) {
+      body {
+        padding: 14px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
- 
-  <!-- HEADER -->
-  <header>
-    <div class="logo">
-      <div class="logo-icon">🏥</div>
-      <span class="logo-text">Green Valley Medical Center</span>
-    </div>
-    <div class="header-right">
-      <span>Patient Portal</span>
-      <button class="btn-logout">Log Out</button>
-    </div>
-  </header>
- 
-  <div class="page-wrapper">
- 
-    <!-- WELCOME BAR -->
-    <div class="welcome-bar">
-      <div>
-        <h1>Welcome back, Jane!</h1>
-        <p>Here's a summary of your health information.</p>
-      </div>
-      <div class="last-login">Last login: April 1, 2026 · 9:14 AM</div>
-    </div>
- 
-    <div class="grid">
- 
-      <!-- PATIENT PERSONAL INFO -->
-      <div class="card full-width">
-        <div class="card-header">
-          <span class="icon">👤</span> Patient Information
-        </div>
-        <div class="card-body">
-          <div class="info-grid">
-            <div class="info-item">
-              <label>Full Name</label>
-              <p>Jane M. Doe</p>
-            </div>
-            <div class="info-item">
-              <label>Date of Birth</label>
-              <p>March 14, 1985 &nbsp;(Age 41)</p>
-            </div>
-            <hr class="info-divider"/>
-            <div class="info-item">
-              <label>Patient ID</label>
-              <p>GVM-00487291</p>
-            </div>
-            <div class="info-item">
-              <label>Primary Care Physician</label>
-              <p>Dr. Samuel Ortega, MD</p>
-            </div>
-            <hr class="info-divider"/>
-            <div class="info-item">
-              <label>Phone Number</label>
-              <p>(304) 555-0192</p>
-            </div>
-            <div class="info-item">
-              <label>Email Address</label>
-              <p>jane.doe@email.com</p>
-            </div>
-            <hr class="info-divider"/>
-            <div class="info-item">
-              <label>Address</label>
-              <p>742 Evergreen Terrace, Huntington, WV 25701</p>
-            </div>
-            <div class="info-item">
-              <label>Emergency Contact</label>
-              <p>John Doe &nbsp;·&nbsp; (304) 555-0134</p>
-            </div>
-          </div>
-        </div>
-      </div>
- 
-      <!-- UPCOMING APPOINTMENTS -->
-      <div class="card">
-        <div class="card-header">
-          <span class="icon">📅</span> Upcoming Appointments
-        </div>
-        <div class="card-body">
- 
-          <div class="appointment">
-            <div class="appt-date-box">
-              <div class="month">Apr</div>
-              <div class="day">10</div>
-            </div>
-            <div class="appt-info">
-              <h3>Annual Physical Exam</h3>
-              <p>Dr. Samuel Ortega &nbsp;·&nbsp; 10:00 AM</p>
-              <p>Main Campus – Room 204</p>
-            </div>
-            <span class="appt-badge badge-confirmed">Confirmed</span>
-          </div>
- 
-          <div class="appointment">
-            <div class="appt-date-box">
-              <div class="month">Apr</div>
-              <div class="day">22</div>
-            </div>
-            <div class="appt-info">
-              <h3>Blood Work Follow-Up</h3>
-              <p>Dr. Linda Chow &nbsp;·&nbsp; 2:30 PM</p>
-              <p>Lab Services – Floor 1</p>
-            </div>
-            <span class="appt-badge badge-confirmed">Confirmed</span>
-          </div>
- 
-          <div class="appointment">
-            <div class="appt-date-box">
-              <div class="month">May</div>
-              <div class="day">5</div>
-            </div>
-            <div class="appt-info">
-              <h3>Dermatology Consultation</h3>
-              <p>Dr. Marcus Webb &nbsp;·&nbsp; 11:15 AM</p>
-              <p>West Wing – Suite 310</p>
-            </div>
-            <span class="appt-badge badge-pending">Pending</span>
-          </div>
- 
-        </div>
-      </div>
- 
-      <!-- LAB RESULTS -->
-      <div class="card">
-        <div class="card-header">
-          <span class="icon">🧪</span> Recent Lab Results
-        </div>
-        <div class="card-body" style="padding: 0;">
-          <table class="lab-table">
-            <thead>
-              <tr>
-                <th>Test</th>
-                <th>Result</th>
-                <th>Range</th>
-                <th>Status</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Glucose</td>
-                <td>95 mg/dL</td>
-                <td>70–100</td>
-                <td><span class="status-normal">Normal</span></td>
-                <td>Mar 28</td>
-              </tr>
-              <tr>
-                <td>Hemoglobin</td>
-                <td>11.2 g/dL</td>
-                <td>12.0–16.0</td>
-                <td><span class="status-low">Low</span></td>
-                <td>Mar 28</td>
-              </tr>
-              <tr>
-                <td>Cholesterol</td>
-                <td>218 mg/dL</td>
-                <td>&lt;200</td>
-                <td><span class="status-high">High</span></td>
-                <td>Mar 28</td>
-              </tr>
-              <tr>
-                <td>TSH</td>
-                <td>2.1 mIU/L</td>
-                <td>0.4–4.0</td>
-                <td><span class="status-normal">Normal</span></td>
-                <td>Mar 28</td>
-              </tr>
-              <tr>
-                <td>Vitamin D</td>
-                <td>—</td>
-                <td>20–50 ng/mL</td>
-                <td><span class="status-pending">Pending</span></td>
-                <td>Apr 1</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
- 
-    </div><!-- end .grid -->
-  </div><!-- end .page-wrapper -->
- 
-  <footer>
-    &copy; 2026 Green Valley Medical Center &nbsp;·&nbsp; Patient Portal &nbsp;·&nbsp; For medical emergencies, call <strong>911</strong>
-  </footer>
- 
+  <main class="container">
+    <h1 class="title">Profile</h1>
+    <p class="subtitle"></p>
+
+    <section class="card">
+      <div id="profileGrid" class="grid"></div>
+    </section>
+
+    <div id="status" class="status loading show">Loading profile...</div>
+  </main>
+
+  <script>
+    const profileGrid = document.getElementById("profileGrid");
+    const statusEl = document.getElementById("status");
+    let currentProfile = null;
+
+    function fallback(value) {
+      if (value === null || value === undefined || value === "") {
+        return "N/A";
+      }
+      return String(value);
+    }
+
+    function addField(label, value, full, editableField) {
+      const field = document.createElement("div");
+      field.className = full ? "field full" : "field";
+
+      const head = document.createElement("div");
+      head.className = "field-head";
+
+      const pLabel = document.createElement("p");
+      pLabel.className = "label";
+      pLabel.textContent = label;
+      head.appendChild(pLabel);
+
+      if (editableField) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.type = "button";
+        editBtn.textContent = "Edit";
+        editBtn.addEventListener("click", async function() {
+          const currentValue = fallback(value);
+          const nextValue = prompt("Update " + label + ":", currentValue === "N/A" ? "" : currentValue);
+
+          if (nextValue === null) {
+            return;
+          }
+
+          await updateProfileField(editableField, nextValue.trim());
+        });
+        head.appendChild(editBtn);
+      }
+
+      const pValue = document.createElement("p");
+      pValue.className = "value";
+      pValue.textContent = fallback(value);
+
+      field.appendChild(head);
+      field.appendChild(pValue);
+      profileGrid.appendChild(field);
+    }
+
+    function showError(message) {
+      statusEl.className = "status error show";
+      statusEl.textContent = message;
+    }
+
+    function showLoading(message) {
+      statusEl.className = "status loading show";
+      statusEl.textContent = message;
+    }
+
+    async function updateProfileField(field, value) {
+      try {
+        showLoading("Saving " + field + "...");
+
+        const formData = new FormData();
+        formData.append("field", field);
+        formData.append("value", value);
+
+        const response = await fetch("/updateprofile", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          let message = "Failed to update profile";
+          try {
+            const err = await response.json();
+            if (err && err.error) {
+              message = err.error;
+            }
+          } catch (_ignored) {
+          }
+          throw new Error(message);
+        }
+
+        await loadProfile();
+      } catch (error) {
+        showError(error.message || "Unable to update profile");
+      }
+    }
+
+    async function loadProfile() {
+      try {
+        showLoading("Loading profile...");
+
+        const response = await fetch("/profile");
+        if (!response.ok) {
+          throw new Error("Failed to load profile (" + response.status + ")");
+        }
+
+        const data = await response.json();
+        currentProfile = data;
+        profileGrid.innerHTML = "";
+
+        addField("Username", data.username, false, null);
+        addField("Name", data.name, false);
+        addField("Role", data.role, false);
+        addField("Phone Number", data.phoneNumber, false, "phoneNumber");
+
+        if ((data.role || "").toLowerCase() === "patient") {
+          addField("Age", data.age, false);
+          addField("Height", data.height || data.high, false);
+          addField("Address", data.address, true, "address");
+          addField("Emergency Contact", data.emergencyContact, true, "emergencyContact");
+        } else if ((data.role || "").toLowerCase() === "doctor") {
+          addField("Position", data.position, false);
+          addField("Specialty", data.specialty, false);
+          addField("Address", data.address, true, "address");
+        }
+
+        statusEl.className = "status";
+        statusEl.textContent = "";
+      } catch (error) {
+        showError(error.message || "Unable to load profile");
+      }
+    }
+
+    loadProfile();
+  </script>
 </body>
 </html>

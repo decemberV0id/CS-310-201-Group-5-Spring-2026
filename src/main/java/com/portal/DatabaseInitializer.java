@@ -14,7 +14,7 @@ public class DatabaseInitializer {
 
                 // Create tables
                 stmt.execute("""
-                    CREATE TABLE IF NOT EXISTS Account (
+                    CREATE TABLE Account (
                         user_name TEXT PRIMARY KEY,
                         email TEXT UNIQUE,
                         password TEXT NOT NULL,
@@ -25,7 +25,7 @@ public class DatabaseInitializer {
                 """);
 
                 stmt.execute("""
-                    CREATE TABLE IF NOT EXISTS PatientAccount (
+                    CREATE TABLE PatientAccount (
                         patient_account_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_name TEXT UNIQUE NOT NULL,
                         age INTEGER,
@@ -33,6 +33,8 @@ public class DatabaseInitializer {
                         height REAL,
                         first_name TEXT,
                         last_name TEXT,
+                        address TEXT,
+                        emergency_contact TEXT,
                         previous_clinic TEXT,
                         preconditions TEXT,
                         FOREIGN KEY (user_name) REFERENCES Account(user_name)
@@ -40,7 +42,7 @@ public class DatabaseInitializer {
                 """);
 
                 stmt.execute("""
-                    CREATE TABLE IF NOT EXISTS StaffAccount (
+                    CREATE TABLE StaffAccount (
                         staff_account_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_name TEXT UNIQUE NOT NULL,
                         employeeid TEXT UNIQUE,
@@ -52,7 +54,7 @@ public class DatabaseInitializer {
                 """);
 
                 stmt.execute("""
-                    CREATE TABLE IF NOT EXISTS PatientChart (
+                    CREATE TABLE PatientChart (
                         patientchart_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         patient_account_id INTEGER NOT NULL,
                         blood_pressure TEXT,
@@ -70,7 +72,7 @@ public class DatabaseInitializer {
                 """);
 
                 stmt.execute("""
-                    CREATE TABLE IF NOT EXISTS LabTestResult (
+                    CREATE TABLE LabTestResult (
                         labtestresult_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         patient_account_id INTEGER NOT NULL,
                         test_name TEXT NOT NULL,
@@ -78,7 +80,7 @@ public class DatabaseInitializer {
                         lab_results TEXT,
                         test_date DATETIME NOT NULL,
                         notes TEXT,
-                        ordered_by INTEGER,
+                        ordered_by TEXT,
                         FOREIGN KEY (patient_account_id) REFERENCES PatientAccount(patient_account_id)
                     )
                 """);
@@ -89,12 +91,13 @@ public class DatabaseInitializer {
                         sender_user_name   TEXT NOT NULL,   -- patient or provider
                         receiver_user_name TEXT NOT NULL,
                         message_text       TEXT NOT NULL,
-                        created_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+                        created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        is_read            INTEGER DEFAULT 0
                     )
                 """);
 
                 stmt.execute("""
-                    CREATE TABLE IF NOT EXISTS Appointment (
+                    CREATE TABLE Appointment (
                         appointment_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         patient_account_id INTEGER NOT NULL,
                         doctor_user_name TEXT NOT NULL,
@@ -111,7 +114,7 @@ public class DatabaseInitializer {
                 """);
 
                 stmt.execute("""
-                    CREATE TABLE IF NOT EXISTS Medication (
+                    CREATE TABLE Medication (
                         medication_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         patient_account_id INTEGER NOT NULL,
                         medicine_name TEXT NOT NULL,
@@ -126,16 +129,16 @@ public class DatabaseInitializer {
             // ==================== INSERT SAMPLE DATA ====================
 
             // johnm
-            insertAccount(conn, "johnm", "john@example.com", "patient");
-            insertPatient(conn, "johnm", 34, "123-45-6789", 175.5, "John", "Miller", "City General", "Hypertension");
+            insertAccount(conn, "johnm", "john@example.com", "304-555-0101", "patient");
+            insertPatient(conn, "johnm", 34, "123-45-6789", 175.5, "John", "Miller", "742 Evergreen Terrace", "Sarah Miller (304-555-0134)", "City General", "Hypertension");
 
             // drsmith
-            insertAccount(conn, "drsmith", "dr.smith@hospital.com", "doctor");
+            insertAccount(conn, "drsmith", "dr.smith@hospital.com", "304-555-0110", "doctor");
             insertStaff(conn, "drsmith", "EMP001", "Cardiologist", "123 Medical Lane", "Cardiology");
 
             // janed
-            insertAccount(conn, "janed", "jane.doe@example.com", "patient");
-            insertPatient(conn, "janed", 28, "987-65-4321", 162.3, "Jane", "Doe", "None", "Asthma");
+            insertAccount(conn, "janed", "jane.doe@example.com", "304-555-0192", "patient");
+            insertPatient(conn, "janed", 28, "987-65-4321", 162.3, "Jane", "Doe", "128 Oak Street", "John Doe (304-555-0192)", "None", "Asthma");
 
             int johnId = getPatientAccountId(conn, "johnm");
             int janeId = getPatientAccountId(conn, "janed");
@@ -144,20 +147,74 @@ public class DatabaseInitializer {
             try (PreparedStatement pstmt = conn.prepareStatement(
                     "INSERT OR IGNORE INTO Messages (sender_user_name, receiver_user_name, message_text) VALUES (?, ?, ?)")) {
 
+                // John -> Dr. Smith (3)
                 pstmt.setString(1, "johnm");
                 pstmt.setString(2, "drsmith");
                 pstmt.setString(3, "Hello Dr. Smith, I have been feeling dizzy lately. Can we schedule an appointment?");
                 pstmt.executeUpdate();
 
+                pstmt.setString(1, "johnm");
+                pstmt.setString(2, "drsmith");
+                pstmt.setString(3, "Also, my blood pressure has been high this week.");
+                pstmt.executeUpdate();
+
+                pstmt.setString(1, "johnm");
+                pstmt.setString(2, "drsmith");
+                pstmt.setString(3, "Would Friday morning work for a follow-up?");
+                pstmt.executeUpdate();
+
+                // Dr. Smith -> John (3)
                 pstmt.setString(1, "drsmith");
                 pstmt.setString(2, "johnm");
                 pstmt.setString(3, "Hi John, thanks for reaching out. Let's meet next week.");
+                pstmt.executeUpdate();
+
+                pstmt.setString(1, "drsmith");
+                pstmt.setString(2, "johnm");
+                pstmt.setString(3, "Please continue your medication and monitor your readings daily.");
+                pstmt.executeUpdate();
+
+                pstmt.setString(1, "drsmith");
+                pstmt.setString(2, "johnm");
+                pstmt.setString(3, "Friday at 10:00 AM works. I have added it to your schedule.");
+                pstmt.executeUpdate();
+
+                // Jane -> Dr. Smith (3)
+                pstmt.setString(1, "janed");
+                pstmt.setString(2, "drsmith");
+                pstmt.setString(3, "Hi Dr. Smith, my asthma has been acting up during workouts.");
+                pstmt.executeUpdate();
+
+                pstmt.setString(1, "janed");
+                pstmt.setString(2, "drsmith");
+                pstmt.setString(3, "I used my rescue inhaler twice yesterday.");
+                pstmt.executeUpdate();
+
+                pstmt.setString(1, "janed");
+                pstmt.setString(2, "drsmith");
+                pstmt.setString(3, "Could we review my current treatment plan this week?");
+                pstmt.executeUpdate();
+
+                // Dr. Smith -> Jane (3)
+                pstmt.setString(1, "drsmith");
+                pstmt.setString(2, "janed");
+                pstmt.setString(3, "Thanks for the update, Jane. Let's review your symptoms in detail.");
+                pstmt.executeUpdate();
+
+                pstmt.setString(1, "drsmith");
+                pstmt.setString(2, "janed");
+                pstmt.setString(3, "Please keep a daily symptom log and avoid known triggers.");
+                pstmt.executeUpdate();
+
+                pstmt.setString(1, "drsmith");
+                pstmt.setString(2, "janed");
+                pstmt.setString(3, "I can see you Thursday at 11:00 AM for your asthma follow-up.");
                 pstmt.executeUpdate();
             }
 
             // ==================== LAB TESTS ====================
             try (PreparedStatement pstmt = conn.prepareStatement(
-                    "INSERT INTO LabTestResult (patient_account_id, test_name, lab_name, lab_results, test_date, notes) VALUES (?, ?, ?, ?, ?, ?)")) {
+                    "INSERT INTO LabTestResult (patient_account_id, test_name, lab_name, lab_results, test_date, notes, ordered_by) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
 
                 // John (3 tests)
                 pstmt.setInt(1, johnId);
@@ -166,6 +223,7 @@ public class DatabaseInitializer {
                 pstmt.setString(4, "Normal");
                 pstmt.setString(5, "2026-03-15 09:30:00");
                 pstmt.setString(6, "All values normal");
+                pstmt.setString(7, "drsmith");
                 pstmt.executeUpdate();
 
                 pstmt.setInt(1, johnId);
@@ -174,6 +232,7 @@ public class DatabaseInitializer {
                 pstmt.setString(4, "LDL slightly high");
                 pstmt.setString(5, "2026-03-20 10:15:00");
                 pstmt.setString(6, "Diet recommended");
+                pstmt.setString(7, "drsmith");
                 pstmt.executeUpdate();
 
                 pstmt.setInt(1, johnId);
@@ -182,6 +241,7 @@ public class DatabaseInitializer {
                 pstmt.setString(4, "138/88 avg");
                 pstmt.setString(5, "2026-04-05 08:45:00");
                 pstmt.setString(6, "Hypertension stage 1");
+                pstmt.setString(7, "drsmith");
                 pstmt.executeUpdate();
 
                 // Jane (4 tests)
@@ -191,6 +251,7 @@ public class DatabaseInitializer {
                 pstmt.setString(4, "Mild obstruction");
                 pstmt.setString(5, "2026-04-01");
                 pstmt.setString(6, "Asthma");
+                pstmt.setString(7, "drsmith");
                 pstmt.executeUpdate();
 
                 pstmt.setInt(1, janeId);
@@ -199,6 +260,7 @@ public class DatabaseInitializer {
                 pstmt.setString(4, "Dust + pollen");
                 pstmt.setString(5, "2026-04-03");
                 pstmt.setString(6, "Triggers found");
+                pstmt.setString(7, "drsmith");
                 pstmt.executeUpdate();
 
                 pstmt.setInt(1, janeId);
@@ -207,6 +269,7 @@ public class DatabaseInitializer {
                 pstmt.setString(4, "Normal");
                 pstmt.setString(5, "2026-04-10");
                 pstmt.setString(6, "Healthy");
+                pstmt.setString(7, "drsmith");
                 pstmt.executeUpdate();
 
                 pstmt.setInt(1, janeId);
@@ -215,6 +278,7 @@ public class DatabaseInitializer {
                 pstmt.setString(4, "Mild hyperinflation");
                 pstmt.setString(5, "2026-04-12");
                 pstmt.setString(6, "Asthma-related");
+                pstmt.setString(7, "drsmith");
                 pstmt.executeUpdate();
             }
 
@@ -334,29 +398,33 @@ public class DatabaseInitializer {
 
     // ==================== HELPERS ====================
 
-    private static void insertAccount(Connection conn, String user, String email, String role) throws SQLException {
+    private static void insertAccount(Connection conn, String user, String email, String contactNumber, String role) throws SQLException {
         try (PreparedStatement pstmt = conn.prepareStatement(
-                "INSERT OR IGNORE INTO Account (user_name, email, password, role) VALUES (?, ?, ?, ?)")) {
+                "INSERT OR IGNORE INTO Account (user_name, email, password, contact_number, role) VALUES (?, ?, ?, ?, ?)")) {
             pstmt.setString(1, user);
             pstmt.setString(2, email);
             pstmt.setString(3, "secret2026");
-            pstmt.setString(4, role);
+            pstmt.setString(4, contactNumber);
+            pstmt.setString(5, role);
             pstmt.executeUpdate();
         }
     }
 
     private static void insertPatient(Connection conn, String user, int age, String ssn, double height,
-                                      String first, String last, String clinic, String conditions) throws SQLException {
+                                      String first, String last, String address, String emergencyContact,
+                                      String clinic, String conditions) throws SQLException {
         try (PreparedStatement pstmt = conn.prepareStatement(
-                "INSERT OR IGNORE INTO PatientAccount VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                "INSERT OR IGNORE INTO PatientAccount VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             pstmt.setString(1, user);
             pstmt.setInt(2, age);
             pstmt.setString(3, ssn);
             pstmt.setDouble(4, height);
             pstmt.setString(5, first);
             pstmt.setString(6, last);
-            pstmt.setString(7, clinic);
-            pstmt.setString(8, conditions);
+            pstmt.setString(7, address);
+            pstmt.setString(8, emergencyContact);
+            pstmt.setString(9, clinic);
+            pstmt.setString(10, conditions);
             pstmt.executeUpdate();
         }
     }
