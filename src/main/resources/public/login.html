@@ -20,12 +20,56 @@
       background: linear-gradient(135deg, #dff5ec, #f4fffa);
     }
 
+    .auth-layout {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
     .login-container {
       background: #ffffff;
       padding: 40px 35px;
       border-radius: 16px;
       width: 320px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    .fake-email {
+      width: 340px;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      border: 1px solid #d8efe6;
+      display: none;
+      overflow: hidden;
+    }
+
+    .fake-email-header {
+      background: #eaf8f2;
+      color: #1a7c5e;
+      font-weight: 700;
+      padding: 12px 14px;
+      font-size: 14px;
+    }
+
+    .fake-email-body {
+      padding: 14px;
+      font-size: 13px;
+      color: #2f3b37;
+      line-height: 1.45;
+    }
+
+    .fake-email-code {
+      margin: 10px 0;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #f4fffa;
+      border: 1px dashed #9fd7c4;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #13765a;
       text-align: center;
     }
 
@@ -80,6 +124,33 @@
       min-height: 20px;
     }
 
+    .verify-block {
+      display: none;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #e6efeb;
+      text-align: left;
+    }
+
+    .verify-label {
+      display: block;
+      margin: 0 0 8px;
+      font-size: 13px;
+      color: #335f54;
+      font-weight: 600;
+    }
+
+    .verify-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .verify-actions button {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+    }
+
     .success {
       color: #1a7c5e;
     }
@@ -91,22 +162,75 @@
 </head>
 <body>
 
-  <div class="login-container">
-    <div class="logo">🌿</div>
-    <h1>Aloe Portal</h1>
+  <div class="auth-layout">
+    <div class="login-container">
+      <div class="logo">🌿</div>
+      <h1>Aloe Portal</h1>
 
-    <form id="myform">
-      <input type="text" name="username" placeholder="Username" required>
-      <input type="password" name="password" placeholder="Password" required>
-      <button type="submit">Login</button>
-    </form>
+      <form id="myform">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+      </form>
 
-    <div id="result" class="message"></div>
+      <div id="result" class="message"></div>
+
+      <div id="verifyBlock" class="verify-block">
+        <label class="verify-label" for="verifyCodeInput">Enter the 4-digit code from your email</label>
+        <input id="verifyCodeInput" type="text" maxlength="4" placeholder="4-digit code">
+        <div class="verify-actions">
+          <button id="verifyButton" type="button">Verify</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="fakeEmail" class="fake-email" aria-live="polite">
+      <div class="fake-email-header">Inbox Preview (Demo)</div>
+      <div class="fake-email-body">
+        <div><strong>From:</strong> Aloe Portal Security</div>
+        <div><strong>To:</strong> <span id="emailTo">doctor@example.com</span></div>
+        <div><strong>Subject:</strong> Your verification code</div>
+        <div style="margin-top: 10px;">Use this one-time code to continue:</div>
+        <div id="fakeEmailCode" class="fake-email-code">0000</div>
+        <div>This is a demo inbox. No real email was sent.</div>
+      </div>
+    </div>
   </div>
 
   <script>
-    document.getElementById("myform").addEventListener("submit", function(e) {
+    const form = document.getElementById("myform");
+    const resultBox = document.getElementById("result");
+    const verifyBlock = document.getElementById("verifyBlock");
+    const verifyInput = document.getElementById("verifyCodeInput");
+    const verifyButton = document.getElementById("verifyButton");
+    const fakeEmail = document.getElementById("fakeEmail");
+    const emailTo = document.getElementById("emailTo");
+    const fakeEmailCode = document.getElementById("fakeEmailCode");
+
+    let expectedDoctorCode = "";
+
+    function showError(message) {
+      resultBox.className = "message error";
+      resultBox.textContent = message;
+    }
+
+    function showSuccess(message) {
+      resultBox.className = "message success";
+      resultBox.textContent = message;
+    }
+
+    function beginRedirect() {
+      showSuccess("Verified. Redirecting...");
+      setTimeout(() => {
+        window.location.href = "/dashboard.html";
+      }, 700);
+    }
+
+    form.addEventListener("submit", function(e) {
       e.preventDefault();
+      expectedDoctorCode = "";
+      verifyBlock.style.display = "none";
+      fakeEmail.style.display = "none";
 
       let formData = new FormData(this);
 
@@ -116,19 +240,57 @@
       })
       .then(response => response.text())
       .then(text => {
-        // Show the message from server
-        document.getElementById("result").innerHTML = text;
+        resultBox.innerHTML = text;
 
-        // If server said "Welcome" → auto redirect after 1 second
         if (text.includes("Welcome")) {
-          setTimeout(() => {
-            window.location.href = "/dashboard.html";
-          }, 1000);
+          return fetch("/verify", { method: "POST" })
+            .then(res => res.json())
+            .then(data => {
+              if (!data || data.error) {
+                showError(data && data.error ? data.error : "Verification failed");
+                return;
+              }
+
+              if (data.role && data.role.toLowerCase() === "patient") {
+                showSuccess("Patient verified. Redirecting...");
+                setTimeout(() => {
+                  window.location.href = "/dashboard.html";
+                }, 700);
+                return;
+              }
+
+              if (data.role && data.role.toLowerCase() === "doctor") {
+                expectedDoctorCode = String(data.code || "");
+                emailTo.textContent = data.email || "doctor@example.com";
+                fakeEmailCode.textContent = expectedDoctorCode;
+                fakeEmail.style.display = "block";
+                verifyBlock.style.display = "block";
+                verifyInput.value = "";
+                showError("Doctor login requires email code verification.");
+                return;
+              }
+
+              showError("Unsupported role for verification.");
+            });
         }
       })
-      .catch(err => {
-        document.getElementById("result").innerHTML = "Error: could not connect";
+      .catch(() => {
+        showError("Error: could not connect");
       });
+    });
+
+    verifyButton.addEventListener("click", function() {
+      const typedCode = verifyInput.value.trim();
+      if (!expectedDoctorCode) {
+        showError("No pending verification code.");
+        return;
+      }
+
+      if (typedCode === expectedDoctorCode) {
+        beginRedirect();
+      } else {
+        showError("Incorrect code. Please try again.");
+      }
     });
   </script>
 

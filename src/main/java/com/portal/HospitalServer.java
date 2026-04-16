@@ -2,6 +2,7 @@ package com.portal;
 
 import io.javalin.Javalin;
 import java.sql.*;
+import java.util.Random;
 
 
 public class HospitalServer {
@@ -58,6 +59,57 @@ public class HospitalServer {
 
             } catch (Exception e) {// Database connection or query error
                 ctx.result("<h2>Database problem :(</h2>)");
+            }
+        });
+
+        app.post("/verify", ctx -> {
+            String username = currentUser;
+
+            if (username == null || username.trim().isEmpty()) {
+                ctx.status(401).contentType("application/json")
+                   .result("{\"error\":\"No user logged in\"}");
+                return;
+            }
+
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:hospital.db")) {
+                PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT role, email FROM Account WHERE user_name = ?"
+                );
+                stmt.setString(1, username);
+
+                ResultSet rs = stmt.executeQuery();
+                if (!rs.next()) {
+                    ctx.status(404).contentType("application/json")
+                       .result("{\"error\":\"User not found\"}");
+                    return;
+                }
+
+                String role = rs.getString("role");
+                String email = rs.getString("email") == null ? "unknown@example.com" : rs.getString("email");
+                String safeRole = role.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+                String safeEmail = email.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+
+                if ("doctor".equalsIgnoreCase(role)) {
+                    int code = 1000 + new Random().nextInt(9000);
+
+                    String payload = "{"
+                        + "\"role\":\"" + safeRole + "\","
+                        + "\"code\":\"" + code + "\","
+                        + "\"email\":\"" + safeEmail + "\""
+                        + "}";
+
+                    ctx.contentType("application/json").result(payload);
+                } else {
+                    String payload = "{"
+                        + "\"role\":\"" + safeRole + "\""
+                        + "}";
+
+                    ctx.contentType("application/json").result(payload);
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                ctx.status(500).contentType("application/json")
+                   .result("{\"error\":\"Database error\"}");
             }
         });
 
